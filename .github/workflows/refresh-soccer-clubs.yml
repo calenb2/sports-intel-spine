@@ -1,9 +1,17 @@
 name: refresh-soccer-clubs
+
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: "15 10 * * 1"   # weekly until Aug; bump to nightly when 2627 season starts
-permissions: { contents: write }
+    - cron: "15 10 * * 1"   # weekly until Aug; nightly once 2627 starts
+
+concurrency:
+  group: spine-write
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -19,9 +27,13 @@ jobs:
           import json, sys
           m = json.load(open("distillates/soccer_clubs/meta.json"))
           print(m)
-          if m["teams_profiled"] < 90: sys.exit("expected 100+ club teams across 6 leagues")
+          if m["teams_profiled"] < 90: sys.exit("expected >= 90 teams for soccer_clubs")
           PY
       - name: Commit
         run: |
-          git config user.name "spine-bot"; git config user.email "spine-bot@users.noreply.github.com"
-          git add -A; git diff --cached --quiet || git commit -m "refresh: soccer club distillates $(date -u +%F)"; git push
+          git config user.name "spine-bot"
+          git config user.email "spine-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "refresh: soccer_clubs distillates $(date -u +%F)"
+          git pull --rebase origin main
+          git push || (git pull --rebase origin main && git push)

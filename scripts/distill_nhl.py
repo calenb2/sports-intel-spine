@@ -25,8 +25,9 @@ ELO_START = 1500.0
 
 def fetch_team_season(tricode: str, season: str) -> list:
     url = f"https://api-web.nhle.com/v1/club-schedule-season/{tricode}/{season}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (sports-intel-spine; github.com/calenb2)"})
     try:
-        with urllib.request.urlopen(url, timeout=45) as r:
+        with urllib.request.urlopen(req, timeout=45) as r:
             data = json.load(r)
     except Exception as e:
         print(f"warn: {tricode} {season}: {e}")
@@ -131,8 +132,4 @@ def main() -> None:
     }
     (OUT / "team_profiles.json").write_text(json.dumps(profiles, separators=(",", ":")), encoding="utf-8")
     (OUT / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
-    print(f"distilled {meta['teams_profiled']} teams from {len(games)} games; through {meta['data_through']}")
-
-
-if __name__ == "__main__":
-    main()
+    print(f"distil
