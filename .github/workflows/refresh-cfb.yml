@@ -1,0 +1,29 @@
+name: refresh-cfb
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 10 * * *"   # nightly in season; harmless offseason
+permissions: { contents: write }
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Distill (requires CFBD_API_KEY secret)
+        env:
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+        run: python scripts/distill_cfb.py
+      - name: Completeness guard
+        run: |
+          python - <<'PY'
+          import json, sys
+          m = json.load(open("distillates/cfb/meta.json"))
+          print(m)
+          if m["teams_profiled"] < 120: sys.exit("expected 130+ FBS teams")
+          PY
+      - name: Commit
+        run: |
+          git config user.name "spine-bot"; git config user.email "spine-bot@users.noreply.github.com"
+          git add -A; git diff --cached --quiet || git commit -m "refresh: cfb distillates $(date -u +%F)"; git push
