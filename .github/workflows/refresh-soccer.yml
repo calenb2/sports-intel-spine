@@ -3,7 +3,7 @@ name: refresh-soccer
 on:
   workflow_dispatch: {}        # manual "Run workflow" button
   schedule:
-    - cron: "0 11 * * *"       # daily 11:00 UTC during the World Cup; relax to weekly ("0 11 * * 1") after the final
+    - cron: "0 5,11,17,23 * * *"   # 4x daily during the World Cup; relax to daily ("0 11 * * *") or weekly after the final
 
 permissions:
   contents: write
@@ -37,6 +37,18 @@ jobs:
 
       - name: Distill
         run: python scripts/distill_soccer.py
+
+      - name: Freshness guard (fail loudly if upstream stalls)
+        run: |
+          python - <<'PY'
+          import json, sys
+          from datetime import date
+          m = json.load(open("distillates/soccer/meta.json"))
+          lag = (date.today() - date.fromisoformat(m["data_through"])).days
+          print(f"data_through={m['data_through']} lag={lag}d")
+          if lag > 3:
+              sys.exit(f"STALE: upstream results lag {lag} days - investigate source")
+          PY
 
       - name: Commit refreshed distillates
         run: |
