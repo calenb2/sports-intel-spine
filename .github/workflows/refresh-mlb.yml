@@ -1,0 +1,42 @@
+name: refresh-mlb
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 9 * * *"        # nightly 09:00 UTC (after West Coast finals); pause after World Series
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Distill MLB (statsapi is fetched inside the script)
+        run: python scripts/distill_mlb.py
+
+      - name: Freshness guard
+        run: |
+          python - <<'PY'
+          import json, sys
+          from datetime import date
+          m = json.load(open("distillates/mlb/meta.json"))
+          lag = (date.today() - date.fromisoformat(m["data_through"])).days
+          print(f"data_through={m['data_through']} lag={lag}d")
+          if lag > 3:
+              sys.exit(f"STALE: MLB results lag {lag} days - investigate statsapi")
+          PY
+
+      - name: Commit refreshed distillates
+        run: |
+          git config user.name "spine-bot"
+          git config user.email "spine-bot@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "refresh: mlb distillates $(date -u +%Y-%m-%d)"
+          git push
