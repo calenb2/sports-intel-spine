@@ -1,0 +1,8 @@
+{
+ "as_of": "2026-07-05",
+ "source": "football-data.co.uk season CSVs",
+ "games_total": 4608,
+ "data_through": "2026-05-24",
+ "teams_profiled": 120,
+ "sia_note": "Odds columns preserved in data/soccer_clubs/raw for market-calibration layer. Offseason until mid-Aug: weekly cron adequate."
+}
