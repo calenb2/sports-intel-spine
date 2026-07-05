@@ -132,4 +132,8 @@ def main() -> None:
     }
     (OUT / "team_profiles.json").write_text(json.dumps(profiles, separators=(",", ":")), encoding="utf-8")
     (OUT / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
-    print(f"distil
+    print(f"distilled {meta['teams_profiled']} teams from {len(games)} games; through {profiles['data_through']}")
+
+
+if __name__ == "__main__":
+    main()
