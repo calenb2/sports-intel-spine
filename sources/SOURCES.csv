@@ -1,0 +1,23 @@
+id,type,source,url,license_or_terms,used_for,notes
+B01,method,NSCA CPSS Scope of Practice,https://www.nsca.com/certification/cpss/scope-of-practice/,reference,SIA doctrine,Sport scientist competencies
+B02,method,UK Sports Institute Performance Analysis,https://uksportsinstitute.co.uk/service/performance-analysis/,reference,SIA doctrine,Systematic observation standard
+B03,method,FIFA EPTS Quality Programme,https://inside.fifa.com/innovation/standards/epts,reference,SIA doctrine,Tracking validation
+B04,method,Soligard et al. 2016 IOC load consensus,https://pubmed.ncbi.nlm.nih.gov/27535989/,reference,SIA doctrine,Load and injury risk
+B05,method,Ardern et al. 2016 return-to-sport consensus,https://pubmed.ncbi.nlm.nih.gov/27226389/,reference,SIA doctrine,RTS continuum
+B06,method,Reardon et al. 2019 IOC mental health consensus,https://pubmed.ncbi.nlm.nih.gov/31097450/,reference,SIA doctrine,Welfare boundaries
+B07,method,Kerksick et al. 2017 ISSN nutrient timing,https://pmc.ncbi.nlm.nih.gov/articles/PMC5596471/,reference,SIA doctrine,Nutrition timing
+B08,method,Tenan & Rezai causal inference tracking,https://www.sloansportsconference.com/research-papers/player-tracking-facilitates-valid-causal-inference-the-average-treatment-effect-of-defender-proximity-on-scoring,reference,SIA doctrine,Causal claims from tracking
+B09,method,AASP CMPC,https://appliedsportpsych.org/certification/,reference,SIA doctrine,Mental performance scope
+B10,method,Renshaw et al. 2022 ecological dynamics,https://www.sciencedirect.com/science/article/pii/S2667239122000089,reference,SIA doctrine,Skill acquisition
+B11,method,Mead et al. 2023 expected goals,https://pmc.ncbi.nlm.nih.gov/articles/PMC10075453/,reference,SIA doctrine,Opportunity quality metrics
+B12,method,AASP / Team USA mental performance,https://www.usopc.org/mental-performance,reference,SIA doctrine,Applied mental skills
+D01,data,martj42 international_results (GitHub mirror of Kaggle set),https://github.com/martj42/international_results,CC BY 4.0 (verify on repo),Soccer Tier-2 rolling + WC base rates,Pulled by refresh workflow; includes World Cup
+D02,data,World Football Elo Ratings,https://eloratings.net/,permissive reuse per site,Soccer team strength prior,Manual CSV via Kaggle mirrors; drop as data/soccer/raw/elo.csv
+D03,data,Kaggle 2026 FIFA WC Historical Elo,https://www.kaggle.com/datasets/afonsofernandescruz/2026-fifa-world-cup-historical-elo-ratings,Kaggle dataset license,WC 2026 Elo seed,Calen downloads (Kaggle account)
+D04,data,nflverse data releases,https://github.com/nflverse/nflverse-data/releases,CC; free,NFL Tier-2 (Phase R1),Nightly in-season; no account needed
+D05,data,MLB StatsAPI,https://statsapi.mlb.com,free public JSON,MLB Tier-2 (rollout),No key required
+D06,data,Sackmann tennis_atp / tennis_wta,https://github.com/jeffsackmann/tennis_atp,CC BY-NC-SA 4.0,Tennis archives,Check recency; fallback D07
+D07,data,TML-Database (live ATP results),https://github.com/Tennismylife/TML-Database,verify repo terms,Tennis rolling,Live-updated alternative
+D08,data,football-data.co.uk,https://www.football-data.co.uk/,free CSVs,Club soccer + historical odds (rollout),League CSVs with closing odds
+D09,data,Olympedia historical archive (Kaggle),https://www.kaggle.com/datasets/josephcheng123456/olympic-historical-dataset-from-olympediaorg,Kaggle dataset license,Olympics Tier-1 archive,1896-2022; append 2024/2026
+D10,data,CollegeFootballData,https://collegefootballdata.com/,free API key,CFB Tier-2 (rollout),Create free key at rollout

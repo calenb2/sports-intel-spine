@@ -1,0 +1,47 @@
+name: refresh-soccer
+
+on:
+  workflow_dispatch: {}        # manual "Run workflow" button
+  schedule:
+    - cron: "0 11 * * *"       # daily 11:00 UTC during the World Cup; relax to weekly ("0 11 * * 1") after the final
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -r scripts/requirements.txt
+
+      - name: Pull raw sources (martj42 international results)
+        run: |
+          set -e
+          BASE="https://raw.githubusercontent.com/martj42/international_results"
+          for BR in master main; do
+            if curl -fsSL -o data/soccer/raw/results.csv "$BASE/$BR/results.csv"; then
+              echo "pulled results.csv from $BR"; break
+            fi
+          done
+          test -s data/soccer/raw/results.csv
+          curl -fsSL -o data/soccer/raw/shootouts.csv "$BASE/master/shootouts.csv" \
+            || curl -fsSL -o data/soccer/raw/shootouts.csv "$BASE/main/shootouts.csv" \
+            || echo "shootouts.csv unavailable - continuing"
+
+      - name: Distill
+        run: python scripts/distill_soccer.py
+
+      - name: Commit refreshed distillates
+        run: |
+          git config user.name "spine-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "refresh: soccer distillates $(date -u +%Y-%m-%d)"
+          git push

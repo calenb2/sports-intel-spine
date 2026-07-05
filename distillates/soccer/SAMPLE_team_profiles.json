@@ -1,0 +1,16 @@
+{
+  "_status": "SAMPLE ONLY - first workflow run replaces this with team_profiles.json built from real data",
+  "_schema": {
+    "as_of": "ISO date",
+    "window_years": 4,
+    "teams": {
+      "TeamName": {
+        "gp": 0, "w": 0, "d": 0, "l": 0,
+        "gf_pg": 0.0, "ga_pg": 0.0,
+        "comp_gp": 0, "comp_w_rate": 0.0,
+        "last10": "W-D-L string",
+        "elo": null, "elo_rank": null
+      }
+    }
+  }
+}
