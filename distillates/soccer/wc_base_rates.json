@@ -1,0 +1,48 @@
+{
+ "as_of": "2026-07-05",
+ "all_time": {
+  "games": 1054,
+  "draw_rate_ft": 0.225,
+  "avg_goals": 2.83,
+  "goals_le_1_rate": 0.266,
+  "goals_ge_4_rate": 0.306,
+  "designated_home_w_rate": 0.458
+ },
+ "last_5_editions": {
+  "games": 346,
+  "draw_rate_ft": 0.231,
+  "avg_goals": 2.65,
+  "goals_le_1_rate": 0.277,
+  "goals_ge_4_rate": 0.257,
+  "designated_home_w_rate": 0.434
+ },
+ "editions_included": [
+  1930,
+  1934,
+  1938,
+  1950,
+  1954,
+  1958,
+  1962,
+  1966,
+  1970,
+  1974,
+  1978,
+  1982,
+  1986,
+  1990,
+  1994,
+  1998,
+  2002,
+  2006,
+  2010,
+  2014,
+  2018,
+  2022,
+  2026
+ ],
+ "caveats": [
+  "Scores may include extra time for knockout games; treat draw_rate_ft as approximate",
+  "Most WC games are neutral-venue; designated_home_w_rate is not a true home-advantage measure"
+ ]
+}
