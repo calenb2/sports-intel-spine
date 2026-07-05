@@ -13,6 +13,7 @@ paths:
       operationId: getSoccerTeamProfiles
       summary: Rolling 4-year profiles for all national teams (single fetch covers a whole slate)
       description: Returns as_of, data_through, and per-team form/Elo. Echo data vintage in Block 2.
+      x-openai-isConsequential: false
       responses:
         "200":
           description: JSON object keyed by team name
@@ -20,6 +21,7 @@ paths:
     get:
       operationId: getWorldCupBaseRates
       summary: World Cup reference-class base rates (all-time and recent editions)
+      x-openai-isConsequential: false
       responses:
         "200":
           description: Base-rate JSON with caveats
@@ -27,6 +29,7 @@ paths:
     get:
       operationId: getSoccerDataVintage
       summary: Data vintage and provenance check (call if staleness is suspected)
+      x-openai-isConsequential: false
       responses:
         "200":
           description: Meta JSON with as_of and data_through
