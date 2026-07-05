@@ -1,12 +1,12 @@
 # Paste into: GPT Builder -> Configure -> Actions -> Import schema
-# Replace OWNER with your GitHub username. Auth: None (public repo).
+# Ready as-is (owner: calenb2). Auth: None (public repo).
 openapi: 3.1.0
 info:
   title: Sports Intel Spine
   description: Rolling distillates and postmortem stats for Sports GPT Guru V5. One call per run.
   version: "1.0"
 servers:
-  - url: https://raw.githubusercontent.com/OWNER/sports-intel-spine/main
+  - url: https://raw.githubusercontent.com/calenb2/sports-intel-spine/main
 paths:
   /distillates/soccer/team_profiles.json:
     get:
