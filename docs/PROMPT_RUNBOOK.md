@@ -140,6 +140,8 @@ Expect: outcome vs prediction with row Brier; miss classified per taxonomy (DATA
 - Live rows carry the state timestamp, not the grading time.
 - Grade pre-committed games regardless of outcome.
 - The postmortem CSV is the data; the Stress Tests sheet is the coverage map.
+- **Verify finals before they enter the corpus.** A user-typed final is C-grade evidence until corroborated: prefer two settled sources; immediately post-match (finals unindexed), an eyewitness final plus directional state evidence (cards, penalties) may commit with a re-verify note. If the GPT disputes your stated final, resolve the conflict before logging — it grades under protest by design.
+- Exogenous shocks (red cards, injuries, abandonments) classify as VARIANCE with the event named — don't let a red-card comeback recalibrate the model.
 
 ---
 
@@ -148,9 +150,4 @@ Expect: outcome vs prediction with row Brier; miss classified per taxonomy (DATA
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-07-05 | Initial set from V5 deployment day: instrumented live pattern (provenance + log line), postmortem format, pre-commit selection rule, contract gate phrasing. |
-
-**Queued evolutions:**
-- **V5.1 self-logging:** LIVE LOG LINE and POSTMORTEM ROWS stop being prompt requirements — the GPT writes rows to the repo itself; §3-S2 requirement 2 and §4 paste-backs retire.
-- **Calibration-aware prompts:** once `getCalibrationStats` ships and N≥20/sport, add: "check your calibration history for this sport and cite corrections in Block 2."
-- **App-tile layer:** still never tested with real numbers — first real win%-tile screenshot should be logged here as the S2-tile variant.
-- Maintenance: any prompt pattern change bumps the version and gets one line here explaining why.
+| 1.1 | 2026-07-05 | Added finals-verification and exogenous-sh
