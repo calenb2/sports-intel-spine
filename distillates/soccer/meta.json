@@ -1,9 +1,9 @@
 {
  "as_of": "2026-07-15",
  "source": "github.com/martj42/international_results",
- "rows_total": 49506,
- "data_through": "2026-07-14",
- "teams_profiled": 254,
+ "rows_total": 49518,
+ "data_through": "2026-07-15",
+ "teams_profiled": 257,
  "elo_loaded": true,
  "sia_note": "If data_through lags today by >7 days in-tournament, apply SIA-02 staleness confidence penalty"
 }
