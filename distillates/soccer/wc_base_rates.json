@@ -1,20 +1,20 @@
 {
- "as_of": "2026-07-14",
+ "as_of": "2026-07-15",
  "all_time": {
-  "games": 1064,
-  "draw_rate_ft": 0.224,
+  "games": 1065,
+  "draw_rate_ft": 0.223,
   "avg_goals": 2.83,
   "goals_le_1_rate": 0.265,
   "goals_ge_4_rate": 0.307,
-  "designated_home_w_rate": 0.458
+  "designated_home_w_rate": 0.457
  },
  "last_5_editions": {
-  "games": 356,
-  "draw_rate_ft": 0.228,
-  "avg_goals": 2.67,
+  "games": 357,
+  "draw_rate_ft": 0.227,
+  "avg_goals": 2.66,
   "goals_le_1_rate": 0.275,
   "goals_ge_4_rate": 0.261,
-  "designated_home_w_rate": 0.433
+  "designated_home_w_rate": 0.431
  },
  "editions_included": [
   1930,
