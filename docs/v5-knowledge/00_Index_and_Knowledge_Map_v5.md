@@ -16,8 +16,9 @@ Route every lookup to exactly one home. Never fetch via the Action what a knowle
 | SIA doctrine: 15 sections, analysis modes, decision brief | 10_SIA_Method_Condensed_v1 |
 | World Cup 2026 ontology, weight profile, base rates, tripwires, settlement notes | 11_Sport_Pack_Soccer_WC2026_v1 |
 | Confidence rubric, reason codes, evidence caps, shrinkage blend, ethics allowed-use | 12_Confidence_and_Governance_v1 |
+| MLB ontology, weight profile, starter-matchup emphasis, tripwires | 13_Sport_Pack_MLB_v1 |
 
-**Requires the Action (rolling data — never in knowledge files):** current-season team profiles, live-ish form, data vintage. Soccer: `getSoccerTeamProfiles` (once per run), `getWorldCupBaseRates`, `getSoccerDataVintage`.
+**Requires the Action (rolling data — never in knowledge files):** per-sport TeamProfiles endpoints, once per run per sport — soccer intl (`getSoccerTeamProfiles` + `getWorldCupBaseRates`), club soccer (`getClubSoccerTeamProfiles`), MLB (`getMlbTeamProfiles`), NFL (`getNflTeamProfiles`), CFB (`getCfbTeamProfiles`), NHL (`getNhlTeamProfiles`); vintage/meta endpoints only on suspected staleness.
 
 **Requires browsing (Tier-3 game state):** lineups, injuries, odds, weather, live scores — per 03 §2–8.
 

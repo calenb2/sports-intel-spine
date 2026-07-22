@@ -1,22 +1,21 @@
 # Paste into: GPT Builder -> Configure -> Actions -> Import schema
-# Ready as-is (owner: calenb2). Auth: None (public repo).
+# Ready as-is (owner: calenb2). Auth: None (public repo). v2 - all six live sports.
 openapi: 3.1.0
 info:
   title: Sports Intel Spine
-  description: Rolling distillates and postmortem stats for Sports GPT Guru V5. One call per run.
-  version: "1.0"
+  description: Rolling team distillates per sport. Call the sport's TeamProfiles endpoint ONCE per run (one payload covers a full slate). Meta endpoints only when staleness is suspected.
+  version: "2.0"
 servers:
   - url: https://raw.githubusercontent.com/calenb2/sports-intel-spine/main
 paths:
   /distillates/soccer/team_profiles.json:
     get:
       operationId: getSoccerTeamProfiles
-      summary: Rolling 4-year profiles for all national teams (single fetch covers a whole slate)
-      description: Returns as_of, data_through, and per-team form/Elo. Echo data vintage in Block 2.
+      summary: International soccer - rolling 4-year profiles, all national teams, WC Elo
       x-openai-isConsequential: false
       responses:
         "200":
-          description: JSON object keyed by team name
+          description: JSON keyed by team name
   /distillates/soccer/wc_base_rates.json:
     get:
       operationId: getWorldCupBaseRates
@@ -28,8 +27,88 @@ paths:
   /distillates/soccer/meta.json:
     get:
       operationId: getSoccerDataVintage
-      summary: Data vintage and provenance check (call if staleness is suspected)
+      summary: International soccer data vintage
       x-openai-isConsequential: false
       responses:
         "200":
-          description: Meta JSON with as_of and data_through
+          description: Meta JSON
+  /distillates/soccer_clubs/team_profiles.json:
+    get:
+      operationId: getClubSoccerTeamProfiles
+      summary: Club soccer - EPL, Championship, La Liga, Serie A, Bundesliga, Ligue 1 (per-league Elo)
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: JSON keyed by club name with league field
+  /distillates/soccer_clubs/meta.json:
+    get:
+      operationId: getClubSoccerDataVintage
+      summary: Club soccer data vintage
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: Meta JSON
+  /distillates/mlb/team_profiles.json:
+    get:
+      operationId: getMlbTeamProfiles
+      summary: MLB - all 30 teams, Elo, Pythag, run rates, last10 (nightly, same-day)
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: JSON keyed by team name
+  /distillates/mlb/meta.json:
+    get:
+      operationId: getMlbDataVintage
+      summary: MLB data vintage
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: Meta JSON
+  /distillates/nfl/team_profiles.json:
+    get:
+      operationId: getNflTeamProfiles
+      summary: NFL - 32 teams, Elo, scoring rates, last10
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: JSON keyed by team code
+  /distillates/nfl/meta.json:
+    get:
+      operationId: getNflDataVintage
+      summary: NFL data vintage
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: Meta JSON
+  /distillates/cfb/team_profiles.json:
+    get:
+      operationId: getCfbTeamProfiles
+      summary: College football - FBS-anchored Elo pool, scoring rates, last10
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: JSON keyed by school name
+  /distillates/cfb/meta.json:
+    get:
+      operationId: getCfbDataVintage
+      summary: CFB data vintage
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: Meta JSON
+  /distillates/nhl/team_profiles.json:
+    get:
+      operationId: getNhlTeamProfiles
+      summary: NHL - 32 teams, OT-dampened Elo, goal rates, W-L-OTL last10
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: JSON keyed by team tricode
+  /distillates/nhl/meta.json:
+    get:
+      operationId: getNhlDataVintage
+      summary: NHL data vintage
+      x-openai-isConsequential: false
+      responses:
+        "200":
+          description: Meta JSON
