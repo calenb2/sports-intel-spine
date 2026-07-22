@@ -70,17 +70,35 @@ def build_profiles(games: list, current_season: int) -> dict:
             won = g[gf] > g[ga]
             p["w" if won else "l"] += 1
             p["res"].append("W" if won else "L")
+    last_game: dict = {}
+    for g in sorted(cur, key=lambda x: x["date"]):
+        last_game[g["home"]] = f"{'W' if g['hs'] > g['as_'] else 'L'} {g['hs']}-{g['as_']}"
+        last_game[g["away"]] = f"{'W' if g['as_'] > g['hs'] else 'L'} {g['as_']}-{g['hs']}"
     out = {}
     for t, p in teams.items():
         rs_pg, ra_pg = p["rs"] / p["gp"], p["ra"] / p["gp"]
         pythag = rs_pg ** 1.83 / (rs_pg ** 1.83 + ra_pg ** 1.83) if (rs_pg + ra_pg) else 0.5
+        l10 = p["res"][-10:]
         out[t] = {
             "gp": p["gp"], "w": p["w"], "l": p["l"],
             "rs_pg": round(rs_pg, 2), "ra_pg": round(ra_pg, 2),
+            "rd_g": round(rs_pg - ra_pg, 2),
             "pythag": round(pythag, 3),
-            "last10": "".join(p["res"][-10:]),
+            "last10": "".join(l10),
+            "l10": f"{l10.count('W')}-{l10.count('L')}",
+            "last_game": last_game.get(t, ""),
             "elo": elo.get(t), "elo_rank": rank.get(t),
         }
+    # NSS: 0-100 Net Strength Score = league percentiles, 45% Elo + 35% Pythag + 20% L10 form
+    def pct_ranks(values: dict) -> dict:
+        orderd = sorted(values, key=lambda k: values[k])
+        n = max(len(orderd) - 1, 1)
+        return {t: i / n for i, t in enumerate(orderd)}
+    e_p = pct_ranks({t: v["elo"] or 0 for t, v in out.items()})
+    p_p = pct_ranks({t: v["pythag"] for t, v in out.items()})
+    f_p = pct_ranks({t: int(v["l10"].split("-")[0]) for t, v in out.items()})
+    for t, v in out.items():
+        v["nss"] = round(100 * (0.45 * e_p[t] + 0.35 * p_p[t] + 0.20 * f_p[t]))
     return out
 
 

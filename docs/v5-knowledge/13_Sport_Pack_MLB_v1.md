@@ -31,7 +31,23 @@ Per team: `gp, w, l, rs_pg, ra_pg, pythag, last10, elo, elo_rank` over a two-sea
 - Lineup rest day for 2+ core bats → shift ~1–2% and drop confidence a notch, code LINEUP_NEWS.
 - Doubleheader game 2 → rotation depth game; widen bands.
 
-## 6. Data plumbing
+## 6. MLB power table (standard closer)
+After the Run Summaries in every MLB PREDICT_GAMES run — and any time the user asks for a "power table" over listed teams — append this exact monospace table covering every team in the run (or the user's list), sorted by NSS descending:
+
+```
+RK | TEAM | W-L   | RD/G  | L10 | LAST   | NSS
+------------------------------------------------
+1  | MIL  | 63-37 | +1.36 | 6-4 | W 8-3  | 92
+```
+
+Column sources — every value comes verbatim from the getMlbTeamProfiles payload, never recomputed:
+- TEAM: standard abbreviation of the payload team name.
+- W-L: `w`-`l` · RD/G: `rd_g` with sign · L10: `l10` · LAST: `last_game` · NSS: `nss`.
+- RK: position after sorting the displayed teams by `nss` descending.
+- NSS definition (computed in the spine, deterministic): 0–100 Net Strength Score = league-wide percentiles blended 45% Elo + 35% Pythagorean expectation + 20% last-10 form.
+If a field is empty (early season), print "—" rather than inventing a value.
+
+## 7. Data plumbing
 - Staleness window in season: 2 days (`data_through` older → DATA_STALE, −1 grade).
 - Statcast enrichment (xwOBA-class hitting/pitching quality) is queued as R1.2 — until then, quality metrics beyond run rates come from browsing per `03_Source_Registry` §7.
 - World Series/postseason base rates: one-time Retrosheet pull queued; until then use browse-sourced base rates with a C source grade.
