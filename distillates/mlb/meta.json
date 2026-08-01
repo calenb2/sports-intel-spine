@@ -1,8 +1,8 @@
 {
- "as_of": "2026-07-31",
+ "as_of": "2026-08-01",
  "source": "statsapi.mlb.com schedule endpoint",
- "games_total": 4072,
- "data_through": "2026-07-30",
+ "games_total": 4087,
+ "data_through": "2026-07-31",
  "teams_profiled": 30,
  "sia_note": "In-season staleness window 2 days; apply DATA_STALE penalty beyond it"
 }
