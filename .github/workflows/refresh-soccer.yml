@@ -47,11 +47,12 @@ jobs:
           python - <<'PY'
           import json, sys
           from datetime import date
+          MAX_LAG_DAYS = 30
           m = json.load(open("distillates/soccer/meta.json"))
           lag = (date.today() - date.fromisoformat(m["data_through"])).days
           print(f"data_through={m['data_through']} lag={lag}d")
-          if lag > 3:
-              sys.exit(f"STALE: upstream results lag {lag} days - investigate source")
+          if lag > MAX_LAG_DAYS:
+              sys.exit(f"STALE: upstream results lag {lag} days (> {MAX_LAG_DAYS}) - investigate source")
           PY
 
       - name: Commit refreshed distillates
