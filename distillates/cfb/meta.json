@@ -1,8 +1,8 @@
 {
- "as_of": "2026-10-20",
+ "as_of": "2026-10-21",
  "source": "api.collegefootballdata.com /games",
- "games_total": 6056,
- "data_through": "2026-10-18",
+ "games_total": 6059,
+ "data_through": "2026-10-20",
  "teams_profiled": 714,
  "sia_note": "Free-tier friendly: one bulk call per season, nightly in season only."
 }
