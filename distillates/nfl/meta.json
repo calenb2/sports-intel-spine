@@ -1,8 +1,8 @@
 {
- "as_of": "2026-10-25",
+ "as_of": "2026-10-26",
  "source": "nflverse games data",
- "games_total": 379,
- "data_through": "2026-10-22",
+ "games_total": 391,
+ "data_through": "2026-10-25",
  "teams_profiled": 32,
  "sia_note": "Offseason: staleness window 30d. In season: 2d, nightly cron."
 }
