@@ -2,10 +2,10 @@
   "dataset": "soccer/raw",
   "files": {
     "results.csv": {
-      "source": "https://github.com/martj42/international_results (raw)",
+      "source": "https://raw.githubusercontent.com/martj42/international_results/master/results.csv",
       "license": "CC BY 4.0 - verify current terms on repo",
       "coverage": "Men's full internationals 1872-present incl. FIFA World Cup",
-      "pulled_at": null,
+      "pulled_at": "2026-11-06T03:51:00.985162+00:00",
       "known_caveats": [
         "Scores are final results; extra-time outcomes not separated from 90-minute results",
         "Shootout winners recorded separately in shootouts.csv",
@@ -14,9 +14,15 @@
     },
     "elo.csv": {
       "source": "eloratings.net via Kaggle mirror (Calen manual drop)",
-      "expected_columns": ["team", "rating", "rank"],
+      "expected_columns": [
+        "team",
+        "rating",
+        "rank"
+      ],
       "pulled_at": null,
-      "known_caveats": ["Team-name spelling must match results.csv; distiller tolerates misses with null elo"]
+      "known_caveats": [
+        "Team-name spelling must match results.csv; distiller tolerates misses with null elo"
+      ]
     }
   },
   "sia_reference": "SIA-02 Measurement Validity & Provenance"
