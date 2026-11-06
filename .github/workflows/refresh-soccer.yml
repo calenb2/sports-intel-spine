@@ -25,41 +25,34 @@ jobs:
       - name: Install deps
         run: pip install -r scripts/requirements.txt
 
-      - name: Pull raw sources (martj42 international results)
+      - name: Preserve last published metadata
         run: |
-          set -e
-          BASE="https://raw.githubusercontent.com/martj42/international_results"
-          for BR in master main; do
-            if curl -fsSL -o data/soccer/raw/results.csv "$BASE/$BR/results.csv"; then
-              echo "pulled results.csv from $BR"; break
-            fi
-          done
-          test -s data/soccer/raw/results.csv
-          curl -fsSL -o data/soccer/raw/shootouts.csv "$BASE/master/shootouts.csv" \
-            || curl -fsSL -o data/soccer/raw/shootouts.csv "$BASE/main/shootouts.csv" \
-            || echo "shootouts.csv unavailable - continuing"
+          cp distillates/soccer/meta.json "$RUNNER_TEMP/soccer-previous-meta.json"
+          rm -f distillates/soccer/freshness_status.json
+
+      - name: Pull raw sources (martj42 international results)
+        run: python scripts/pull_soccer.py
 
       - name: Distill
         run: python scripts/distill_soccer.py
 
-      - name: Freshness guard (fail loudly if upstream stalls)
-        run: |
-          python - <<'PY'
-          import json, sys
-          from datetime import date
-          MAX_LAG_DAYS = 30
-          m = json.load(open("distillates/soccer/meta.json"))
-          lag = (date.today() - date.fromisoformat(m["data_through"])).days
-          print(f"data_through={m['data_through']} lag={lag}d")
-          if lag > MAX_LAG_DAYS:
-              sys.exit(f"STALE: upstream results lag {lag} days (> {MAX_LAG_DAYS}) - investigate source")
-          PY
+      - name: Verify calendar and independent fixture coverage
+        run: python scripts/soccer_freshness.py --previous-meta "$RUNNER_TEMP/soccer-previous-meta.json"
+
+      - name: Retain freshness diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soccer-freshness-${{ github.run_id }}
+          path: distillates/soccer/freshness_status.json
+          if-no-files-found: ignore
 
       - name: Commit refreshed distillates
+        if: github.ref == 'refs/heads/main'
         run: |
           git config user.name "spine-bot"
           git config user.email "spine-bot@users.noreply.github.com"
-          git add -A
+          git add data/soccer/raw distillates/soccer
           git diff --cached --quiet || git commit -m "refresh: soccer distillates $(date -u +%Y-%m-%d)"
           git pull --rebase origin main
           git push || (git pull --rebase origin main && git push)

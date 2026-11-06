@@ -24,6 +24,10 @@ docs/                FLIP_TO_PRIVATE.md and operational notes
 
 ## First run
 
+International soccer uses a [calendar and fixture freshness policy](docs/SOCCER_FRESHNESS.md)
+and individually sourced corrections for verified omissions. Review its status
+artifact and calendar coverage when investigating a refresh failure.
+
 Actions tab → `refresh-soccer` → **Run workflow**. Verify `distillates/soccer/team_profiles.json`, `wc_base_rates.json`, and `meta.json` appear with a fresh commit.
 
 ## Rollout order
