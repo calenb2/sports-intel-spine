@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "distillates" / "mlb"
-SEASONS = [date.today().year - 1, date.today().year]
+GAME_TYPES = "R,F,D,L,W"
 ELO_K = 4.0
 ELO_HFA = 24.0
 ELO_START = 1500.0
@@ -21,7 +21,7 @@ ELO_START = 1500.0
 def fetch_season_games(season: int) -> list:
     url = (
         "https://statsapi.mlb.com/api/v1/schedule"
-        f"?sportId=1&gameTypes=R,P&startDate={season}-03-01&endDate={season}-11-15"
+        f"?sportId=1&gameTypes={GAME_TYPES}&startDate={season}-01-01&endDate={season}-12-31"
     )
     with urllib.request.urlopen(url, timeout=60) as r:
         data = json.load(r)
@@ -105,23 +105,28 @@ def build_profiles(games: list, current_season: int) -> dict:
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     games: list = []
-    for season in SEASONS:
-        games.extend(fetch_season_games(season))
+    today = datetime.now(timezone.utc).date()
+    current = fetch_season_games(today.year)
+    # Retain the last completed season until the new season has scored finals.
+    profile_season = today.year if current else today.year - 1
+    seasons = [profile_season - 1, profile_season]
+    for season in seasons:
+        games.extend(current if season == today.year else fetch_season_games(season))
     if not games:
         raise SystemExit("no completed games fetched - check statsapi availability")
     as_of = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     latest = max(g["date"] for g in games)
     profiles = {
         "as_of": as_of, "data_through": latest,
-        "window": f"{SEASONS[0]}-{SEASONS[-1]} regular+postseason finals",
+        "window": f"{seasons[0]}-{seasons[-1]} regular+postseason finals",
         "elo_note": f"simple Elo k={ELO_K} hfa={ELO_HFA} over window; rank within MLB",
-        "teams": build_profiles(games, SEASONS[-1]),
+        "teams": build_profiles(games, profile_season),
     }
     meta = {
         "as_of": as_of, "source": "statsapi.mlb.com schedule endpoint",
-        "games_total": len(games), "data_through": latest,
+        "games_total": len(games), "data_through": latest, "profile_season": profile_season,
         "teams_profiled": len(profiles["teams"]),
-        "sia_note": "In-season staleness window 2 days; apply DATA_STALE penalty beyond it",
+        "sia_note": "See season_status.json: 3-day active-season freshness guard; offseason retains last finals",
     }
     (OUT / "team_profiles.json").write_text(json.dumps(profiles, separators=(",", ":")), encoding="utf-8")
     (OUT / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
@@ -130,3 +135,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
