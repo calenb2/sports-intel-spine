@@ -1,8 +1,9 @@
 {
- "as_of": "2026-09-30",
+ "as_of": "2026-11-06",
  "source": "statsapi.mlb.com schedule endpoint",
- "games_total": 4864,
- "data_through": "2026-09-27",
+ "games_total": 4951,
+ "data_through": "2026-10-28",
+ "profile_season": 2026,
  "teams_profiled": 30,
- "sia_note": "In-season staleness window 2 days; apply DATA_STALE penalty beyond it"
+ "sia_note": "See season_status.json: 3-day active-season freshness guard; offseason retains last finals"
 }
