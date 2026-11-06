@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+from soccer_freshness import merged_result_rows
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "soccer" / "raw"
@@ -20,10 +21,15 @@ LAST_N_WC = 5
 
 
 def load_results() -> pd.DataFrame:
-    df = pd.read_csv(RAW / "results.csv", parse_dates=["date"])
-    df = df.dropna(subset=["home_score", "away_score"]).copy()
+    rows, provenance = merged_result_rows(
+        RAW / "results.csv", ROOT / "data/soccer/result_supplements.json",
+        datetime.now(timezone.utc).date())
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date"])
     df["home_score"] = df["home_score"].astype(int)
     df["away_score"] = df["away_score"].astype(int)
+    df["neutral"] = df["neutral"].map({"TRUE": True, "FALSE": False})
+    df.attrs.update(provenance)
     return df
 
 
@@ -139,7 +145,9 @@ def main() -> None:
     meta = {
         "as_of": as_of,
         "source": "github.com/martj42/international_results",
+        "supplement_provenance": "data/soccer/result_supplements.json",
         "rows_total": int(len(df)),
+        **df.attrs,
         "data_through": latest.strftime("%Y-%m-%d"),
         "teams_profiled": len(profiles["teams"]),
         "elo_loaded": bool(elo),

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "reviewed_on": "2026-11-06",
+  "purpose": "Verified omissions; upstream rows win only when scores agree. Do not infer or synthesize results.",
+  "results": [
+    {
+      "date": "2026-10-04", "home_team": "Bahamas", "away_team": "United States Virgin Islands",
+      "home_score": "2", "away_score": "3", "tournament": "CONCACAF Nations League",
+      "city": "Christiansted", "country": "United States Virgin Islands", "neutral": "FALSE",
+      "source": "https://www.concacaf.com/competitions/nations-league/news/last-minute-victory-for-aruba-in-group-b"
+    },
+    {
+      "date": "2026-11-05", "home_team": "Pakistan", "away_team": "India",
+      "home_score": "2", "away_score": "3", "tournament": "SAFF Championship",
+      "city": "Dhaka", "country": "Bangladesh", "neutral": "TRUE",
+      "source": "https://www.the-aiff.com/article/india-defeat-pakistan-in-saff-championship-opener"
+    },
+    {
+      "date": "2026-11-05", "home_team": "Bhutan", "away_team": "Bangladesh",
+      "home_score": "0", "away_score": "1", "tournament": "SAFF Championship",
+      "city": "Dhaka", "country": "Bangladesh", "neutral": "FALSE",
+      "source": "https://saffederation.org/match-results/"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "dataset": "soccer verification and reviewed supplements",
+  "reviewed_on": "2026-11-06",
+  "files": {
+    "calendar.json": {
+      "source": "FIFA calendar and primary federation reports; per-entry links in file",
+      "license": "Public factual verification; source terms apply; no bulk feed redistribution",
+      "coverage": "2026-09-21 through 2026-12-31; expires outside this interval",
+      "known_caveats": ["Regional tournaments must be reviewed separately", "Fixture corrections are exact ID/date/team exceptions"]
+    },
+    "result_supplements.json": {
+      "source": "Concacaf, AIFF and SAFF official match reports; per-row source links",
+      "license": "Manually transcribed match facts; source articles are not reproduced",
+      "coverage": "Three verified omissions: Bahamas-USVI October 4; Pakistan-India and Bhutan-Bangladesh November 5",
+      "known_caveats": ["Not a replacement live results feed", "Conflicts with upstream fail for review; matching upstream rows are not duplicated"]
+    }
+  },
+  "verification_feed": {
+    "source": "https://api.fifa.com/api/v3/calendar/matches",
+    "license": "Public factual verification; FIFA terms apply",
+    "pulled_at": "Recorded as checked_at in each freshness_status.json",
+    "known_caveats": ["Incomplete and sometimes misclassified or outdated", "Unnamed scheduled bracket placeholders cannot witness missing matches", "No exhaustive historical completeness claim"]
+  }
+}
