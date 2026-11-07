@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-11-06T21:55:19.227435+00:00",
-  "as_of": "2026-11-06",
+  "checked_at": "2026-11-07T02:30:57.391379+00:00",
+  "as_of": "2026-11-07",
   "data_through": "2026-11-05",
-  "age_days": 1,
-  "state": "active",
+  "age_days": 2,
+  "state": "awaiting_results",
   "publish_allowed": true,
   "errors": [],
   "active_periods": [
@@ -13,15 +13,27 @@
   "calendar_valid_through": "2026-12-31",
   "required_data_through": "2026-10-04",
   "missing_fixtures": [],
-  "pending_fixtures": [],
-  "fixture_count": 167,
+  "pending_fixtures": [
+    {
+      "date": "2026-11-07",
+      "teams": [
+        "sri lanka",
+        "bhutan"
+      ],
+      "status": 1,
+      "utc_date": "2026-11-07",
+      "id": "7llr2hcj6fmheky7osuxe49g",
+      "deadline": "2026-11-10"
+    }
+  ],
+  "fixture_count": 168,
   "source_data_through": "2026-10-06",
   "supplemental_rows": 3,
   "limitations": "FIFA coverage is not exhaustive; see docs/SOCCER_FRESHNESS.md",
   "unidentified_scheduled_placeholders": 47,
   "fixture_source": "https://api.fifa.com/api/v3/calendar/matches",
   "fixture_queries": [
-    "https://api.fifa.com/api/v3/calendar/matches?from=2026-09-29T00%3A00%3A00Z&to=2026-11-06T23%3A59%3A59Z&count=500",
+    "https://api.fifa.com/api/v3/calendar/matches?from=2026-09-29T00%3A00%3A00Z&to=2026-11-07T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-09-29T00%3A00%3A00Z&to=2026-10-18T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-09-29T00%3A00%3A00Z&to=2026-10-08T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-09-29T00%3A00%3A00Z&to=2026-10-03T23%3A59%3A59Z&count=500",
@@ -39,7 +51,7 @@
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-17T00%3A00%3A00Z&to=2026-10-18T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-17T00%3A00%3A00Z&to=2026-10-17T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-18T00%3A00%3A00Z&to=2026-10-18T23%3A59%3A59Z&count=500",
-    "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-19T00%3A00%3A00Z&to=2026-11-06T23%3A59%3A59Z&count=500",
+    "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-19T00%3A00%3A00Z&to=2026-11-07T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-19T00%3A00%3A00Z&to=2026-10-28T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-19T00%3A00%3A00Z&to=2026-10-23T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-19T00%3A00%3A00Z&to=2026-10-21T23%3A59%3A59Z&count=500",
@@ -55,7 +67,7 @@
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-25T12%3A00%3A00Z&to=2026-10-25T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-26T00%3A00%3A00Z&to=2026-10-26T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-27T00%3A00%3A00Z&to=2026-10-28T23%3A59%3A59Z&count=500",
-    "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-29T00%3A00%3A00Z&to=2026-11-06T23%3A59%3A59Z&count=500",
+    "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-29T00%3A00%3A00Z&to=2026-11-07T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-29T00%3A00%3A00Z&to=2026-11-02T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-29T00%3A00%3A00Z&to=2026-10-31T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-10-29T00%3A00%3A00Z&to=2026-10-30T23%3A59%3A59Z&count=500",
@@ -65,6 +77,10 @@
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-11-01T00%3A00%3A00Z&to=2026-11-02T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-11-01T00%3A00%3A00Z&to=2026-11-01T23%3A59%3A59Z&count=500",
     "https://api.fifa.com/api/v3/calendar/matches?from=2026-11-02T00%3A00%3A00Z&to=2026-11-02T23%3A59%3A59Z&count=500",
-    "https://api.fifa.com/api/v3/calendar/matches?from=2026-11-03T00%3A00%3A00Z&to=2026-11-06T23%3A59%3A59Z&count=500"
+    "https://api.fifa.com/api/v3/calendar/matches?from=2026-11-03T00%3A00%3A00Z&to=2026-11-07T23%3A59%3A59Z&count=500",
+    "https://api.fifa.com/api/v3/calendar/matches?from=2026-11-03T00%3A00%3A00Z&to=2026-11-05T23%3A59%3A59Z&count=500",
+    "https://api.fifa.com/api/v3/calendar/matches?from=2026-11-06T00%3A00%3A00Z&to=2026-11-07T23%3A59%3A59Z&count=500",
+    "https://api.fifa.com/api/v3/calendar/matches?from=2026-11-06T00%3A00%3A00Z&to=2026-11-06T23%3A59%3A59Z&count=500",
+    "https://api.fifa.com/api/v3/calendar/matches?from=2026-11-07T00%3A00%3A00Z&to=2026-11-07T23%3A59%3A59Z&count=500"
   ]
 }

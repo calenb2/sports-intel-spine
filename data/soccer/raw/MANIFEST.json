@@ -5,7 +5,7 @@
       "source": "https://raw.githubusercontent.com/martj42/international_results/master/results.csv",
       "license": "CC BY 4.0 - verify current terms on repo",
       "coverage": "Men's full internationals 1872-present incl. FIFA World Cup",
-      "pulled_at": "2026-11-06T21:54:34.598855+00:00",
+      "pulled_at": "2026-11-07T02:30:13.881823+00:00",
       "known_caveats": [
         "Scores are final results; extra-time outcomes not separated from 90-minute results",
         "Shootout winners recorded separately in shootouts.csv",
