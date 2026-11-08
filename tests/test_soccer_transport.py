@@ -23,8 +23,12 @@ class FakeResponse:
     def __init__(self, body, status=200, headers=None):
         self.body, self.status, self.headers = body, status, headers or {}
 
-    def read(self):
-        return self.body
+    def read(self, n=-1):
+        if n is None or n < 0:
+            data, self.body = self.body, b""
+            return data
+        data, self.body = self.body[:n], self.body[n:]
+        return data
 
     def getcode(self):
         return self.status
@@ -236,6 +240,88 @@ class SanitizeTests(unittest.TestCase):
         self.assertNotIn("zzz", shown)
         self.assertIn("from=a", shown)
         self.assertEqual(shown.count("REDACTED"), 3)
+
+
+class StreamingResponse:
+    """Body delivered in chunks; each chunk advances the injected clock."""
+
+    def __init__(self, chunks, clock, seconds_per_chunk, status=200):
+        self.chunks, self.clock, self.step, self.status = list(chunks), clock, seconds_per_chunk, status
+        self.headers = {}
+
+    def read(self, n=-1):
+        if not self.chunks:
+            return b""
+        self.clock.now += self.step
+        return self.chunks.pop(0)
+
+    def getcode(self):
+        return self.status
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class DeadlineTests(unittest.TestCase):
+    """The elapsed budget is end-to-end: it covers slow streaming reads, not just connects."""
+
+    def test_slow_stream_past_deadline_fails_as_budget_and_is_not_retried(self):
+        clock = Clock()
+        budget = t.Budget(max_requests=10, max_elapsed_s=5, clock=clock)
+        opener = scripted(StreamingResponse([b"a" * 10] * 10, clock, seconds_per_chunk=1.0))
+        with self.assertRaises(t.TransportError) as ctx:
+            fetch(opener, clock=clock, budget=budget)
+        self.assertEqual(ctx.exception.category, "budget")
+        self.assertEqual(len(opener.calls), 1)                 # not retried
+        self.assertEqual(budget.history[0]["error"], "deadline_exceeded")
+        self.assertIn("bytes streamed", budget.history[0]["detail"])
+
+    def test_late_but_complete_read_within_deadline_succeeds(self):
+        clock = Clock()
+        budget = t.Budget(max_requests=10, max_elapsed_s=5, clock=clock)
+        opener = scripted(StreamingResponse([b"abc", b"def", b"ghi"], clock, seconds_per_chunk=1.5))
+        (body, info), _, _ = fetch(opener, clock=clock, budget=budget)
+        self.assertEqual(body, b"abcdefghi")                   # 4.5 s elapsed < 5 s: accepted
+        self.assertEqual(info["attempts"], 1)
+        self.assertAlmostEqual(budget.remaining_time(), 0.5)
+        # The next request only gets what is left (0.5 s socket timeout)...
+        nxt = scripted(FakeResponse(b"x"))
+        fetch(nxt, clock=clock, budget=budget, timeout=45)
+        self.assertAlmostEqual(nxt.calls[0][1], 0.5)
+        # ...and once the deadline has passed, requests are refused before connecting.
+        clock.now = 5.0
+        with self.assertRaises(t.TransportError) as ctx:
+            fetch(scripted(FakeResponse(b"x")), clock=clock, budget=budget)
+        self.assertEqual(ctx.exception.category, "budget")
+
+    def test_subsecond_remaining_budget_is_passed_as_socket_timeout(self):
+        clock = Clock()
+        budget = t.Budget(max_requests=5, max_elapsed_s=10, clock=clock)
+        clock.now = 9.6
+        opener = scripted(FakeResponse(b"ok"))
+        fetch(opener, clock=clock, budget=budget, timeout=45)
+        self.assertAlmostEqual(opener.calls[0][1], 0.4, places=6)   # no 1 s floor
+
+    def test_socket_timeout_during_read_is_retried_within_budget(self):
+        clock = Clock()
+        budget = t.Budget(max_requests=5, max_elapsed_s=60, clock=clock)
+        opener = scripted(socket.timeout("read timed out"), FakeResponse(b"ok"))
+        (body, info), _, _ = fetch(opener, clock=clock, budget=budget)
+        self.assertEqual((body, info["attempts"]), (b"ok", 2))
+
+    def test_retry_wait_that_would_cross_deadline_is_refused(self):
+        # Attempt 1 fails at t=0; the 1.0 s backoff exceeds the 0.5 s left, so the
+        # retry is refused instead of silently overrunning the stage deadline.
+        clock = Clock()
+        budget = t.Budget(max_requests=5, max_elapsed_s=0.5, clock=clock)
+        opener = scripted(IncompleteRead(b"", 1), FakeResponse(b"ok"))
+        with self.assertRaises(t.TransportError) as ctx:
+            fetch(opener, clock=clock, budget=budget)
+        self.assertEqual(ctx.exception.category, "budget")
+        self.assertEqual(len(opener.calls), 1)
 
 
 def api_row(match_id, day):
@@ -472,7 +558,7 @@ class DistillateValidationTests(unittest.TestCase):
 
 class DiagnosticsCliTests(unittest.TestCase):
     def test_if_missing_writes_gap_record_once(self):
-        with tempfile.TemporaryDirectory() as folder:
+        with tempfile.TemporaryDirectory() as folder, patch.dict("os.environ", {"GITHUB_RUN_ID": "7"}):
             out = Path(folder) / "status.json"
             self.assertEqual(diag.main(["--if-missing", "--stage", "workflow", "--message", "none",
                                         "--output", str(out), "--previous-meta", str(out)]), 0)
@@ -480,18 +566,20 @@ class DiagnosticsCliTests(unittest.TestCase):
             self.assertEqual(record["error_category"], "diagnostic_gap")
             self.assertFalse(record["publish_allowed"])
             self.assertFalse(record["last_good"]["available"])
-            out.write_text(json.dumps({"state": "ok", "publish_allowed": True}))
+            current = {"schema_version": 2, "run_id": "7", "stage": "verify", "state": "ok", "publish_allowed": True}
+            out.write_text(json.dumps(current))
             diag.main(["--if-missing", "--stage", "workflow", "--message", "none", "--output", str(out)])
-            self.assertEqual(json.loads(out.read_text())["state"], "ok")
+            self.assertEqual(json.loads(out.read_text()), current)
 
     def test_annotate_marks_publish_failure_without_flipping_verdict(self):
-        with tempfile.TemporaryDirectory() as folder:
+        with tempfile.TemporaryDirectory() as folder, patch.dict("os.environ", {"GITHUB_RUN_ID": "7"}):
             out = Path(folder) / "status.json"
-            out.write_text(json.dumps({"stage": "verify", "state": "active", "publish_allowed": True}))
+            out.write_text(json.dumps({"schema_version": 2, "run_id": "7", "stage": "verify",
+                                       "state": "active", "publish_allowed": True}))
             diag.main(["--annotate", "--stage", "publish", "--message", "push failed", "--output", str(out)])
             record = json.loads(out.read_text())
-            self.assertTrue(record["publish_allowed"])   # the verify verdict is preserved ...
-            self.assertFalse(record["published"])         # ... but publication is recorded as not done
+            self.assertTrue(record["publish_allowed"])      # the verify verdict is preserved ...
+            self.assertEqual(record["published"], "unknown")  # ... publication is not claimed either way
             self.assertEqual(record["stage_outcomes"]["publish"]["message"], "push failed")
 
     def test_classification(self):

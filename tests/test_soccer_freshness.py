@@ -22,8 +22,12 @@ class FakeResponse:
         self.body, self.status = body, status
         self.headers = headers or {}
 
-    def read(self):
-        return self.body
+    def read(self, n=-1):
+        if n is None or n < 0:
+            data, self.body = self.body, b""
+            return data
+        data, self.body = self.body[:n], self.body[n:]
+        return data
 
     def getcode(self):
         return self.status

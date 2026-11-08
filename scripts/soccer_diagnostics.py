@@ -6,8 +6,16 @@ evidence of what happened; it never grants permission to publish.
 
 Usage from a shell step::
 
+    python scripts/soccer_diagnostics.py --init --stage workflow --message "..."
     python scripts/soccer_diagnostics.py --if-missing --stage workflow --message "..."
     python scripts/soccer_diagnostics.py --annotate --stage publish --message "..."
+
+``--init`` runs immediately after checkout, before dependencies are installed,
+and unconditionally replaces whatever the checkout contained (normally the
+previous successful run's committed status). From that point the file always
+describes *this* run. ``--if-missing`` and ``--annotate`` refuse to treat a
+record as current unless it parses, has this schema version and carries this
+run's ``GITHUB_RUN_ID``; anything else is recorded as a rejected stale record.
 """
 import argparse
 import json
@@ -125,6 +133,40 @@ def emit_failure(stage, exc, path=DEFAULT_OUTPUT, **kwargs):
     return record
 
 
+def load_current_record(path, run_id=None):
+    """Return (record, rejection). A record is current only if it parses, has this
+    schema version and belongs to this run (when a run id is known)."""
+    path = Path(path)
+    if not path.exists():
+        return None, None
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, OSError) as exc:
+        return None, {"reason": "malformed", "detail": f"{type(exc).__name__}: {exc}"}
+    if not isinstance(record, dict):
+        return None, {"reason": "malformed", "detail": "not a JSON object"}
+    if record.get("schema_version") != SCHEMA_VERSION:
+        return None, {"reason": "schema_mismatch", "schema_version": record.get("schema_version"),
+                      "run_id": record.get("run_id"), "checked_at": record.get("checked_at")}
+    run_id = run_id if run_id is not None else os.environ.get("GITHUB_RUN_ID")
+    if run_id and record.get("run_id") != run_id:
+        return None, {"reason": "wrong_run", "run_id": record.get("run_id"),
+                      "stage": record.get("stage"), "checked_at": record.get("checked_at")}
+    return record, None
+
+
+def init_record(stage, message, previous_meta=DEFAULT_PREVIOUS_META, superseded=None):
+    record = base_record(stage)
+    record.update({"state": "in_progress", "publish_allowed": False,
+                   "error_category": None, "errors": [],
+                   "started_at": record["checked_at"],
+                   "note": message,
+                   "last_good": last_good_summary(previous_meta)})
+    if superseded:
+        record["superseded_record"] = superseded
+    return record
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stage", required=True)
@@ -132,33 +174,51 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--previous-meta", type=Path, default=DEFAULT_PREVIOUS_META)
     mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--init", action="store_true",
+                      help="Replace whatever the checkout contained with this run's start record")
     mode.add_argument("--if-missing", action="store_true",
-                      help="Write a gap record only when no diagnostic exists")
+                      help="Write a gap record unless a current record for this run exists")
     mode.add_argument("--annotate", action="store_true",
-                      help="Merge a stage outcome into the existing record (or create one)")
+                      help="Merge a stage outcome into this run's record (or create one)")
     args = parser.parse_args(argv)
-    existing = None
-    if args.output.exists():
-        try:
-            existing = json.loads(args.output.read_text(encoding="utf-8"))
-        except ValueError:
-            existing = {"corrupt_previous_record": True}
+
+    if args.init:
+        superseded = None
+        if args.output.exists():
+            try:
+                old = json.loads(args.output.read_text(encoding="utf-8"))
+                superseded = {"run_id": old.get("run_id"), "stage": old.get("stage"),
+                              "state": old.get("state"), "checked_at": old.get("checked_at")}
+            except (ValueError, OSError):
+                superseded = {"reason": "malformed"}
+        write_record(init_record(args.stage, args.message, args.previous_meta, superseded), args.output)
+        return 0
+
+    existing, rejection = load_current_record(args.output)
     if args.if_missing:
-        if existing is not None:
-            print(f"Diagnostic already present at {args.output}")
+        if existing is not None and existing.get("state") != "in_progress":
+            print(f"Diagnostic for this run already present at {args.output}")
             return 0
         record = base_record(args.stage)
         record.update({"state": "blocked", "publish_allowed": False,
                        "error_category": "diagnostic_gap",
                        "errors": [f"{args.stage}: {args.message}"],
                        "last_good": last_good_summary(args.previous_meta)})
+        if existing is not None:  # this run's init record: no stage ever reported
+            record["started_at"] = existing.get("started_at")
+            record["errors"].append("run started but no stage wrote a result")
+        if rejection:
+            record["rejected_record"] = rejection
         write_record(record, args.output)
         return 0
+
     record = existing or base_record(args.stage)
+    if rejection:
+        record["rejected_record"] = rejection
     record.setdefault("stage_outcomes", {})[args.stage] = {
         "message": args.message, "at": utc_now()}
-    if args.stage == "publish":
-        record["published"] = False
+    if args.stage == "publish" and "published" not in record:
+        record["published"] = "unknown"
     write_record(record, args.output)
     return 0
 

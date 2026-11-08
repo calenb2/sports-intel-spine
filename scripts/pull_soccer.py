@@ -26,10 +26,30 @@ def new_pull_budget():
     return Budget(max_requests=PULL_MAX_REQUESTS, max_elapsed_s=PULL_MAX_ELAPSED_S)
 
 
+class DownloadError(TransportError, ValueError):
+    """Every branch failed. Keeps each branch's typed transport failure.
+
+    Subclasses ``ValueError`` so the optional-file path and older callers that
+    catch ``ValueError`` still work, while ``category``/``url``/``attempts``/
+    ``failures`` survive into the diagnostic instead of collapsing to
+    "validation".
+    """
+
+    def __init__(self, name, failures, history):
+        last = failures[-1]
+        detail = "; ".join(f"{f['branch']}: {f['category']} after {f['attempts']} attempt(s): {f['error']}"
+                           for f in failures)
+        super().__init__(f"Cannot download {name}: {detail}", category=last["category"],
+                         url=last["url"], attempts=last["attempts"], history=history,
+                         last_error=last.get("exception"))
+        self.name = name
+        self.failures = [{k: v for k, v in f.items() if k != "exception"} for f in failures]
+
+
 def download(name, budget=None):
     """Return (body, url) from the first branch that serves a complete file."""
     budget = budget if budget is not None else new_pull_budget()
-    errors = []
+    failures = []
     for branch in BRANCHES:
         url = f"{BASE}/{branch}/{name}"
         try:
@@ -37,10 +57,12 @@ def download(name, budget=None):
             print(f"Downloaded {name} from {branch} in {info['attempts']} attempt(s), {info['bytes']} bytes")
             return body, url
         except TransportError as exc:
-            errors.append(f"{branch}: {exc.category}: {exc}")
+            failures.append({"branch": branch, "url": exc.url, "category": exc.category,
+                             "attempts": exc.attempts, "error": str(exc.last_error or exc)[:300],
+                             "exception": exc})
             if exc.category == "budget":
                 break  # no point trying the next branch with nothing left to spend
-    raise ValueError(f"Cannot download {name}: {'; '.join(errors)}")
+    raise DownloadError(name, failures, budget.history)
 
 
 def pull(raw, budget=None):
@@ -78,8 +100,12 @@ def main(raw=None, output=None):
         pull(raw or ROOT / "data/soccer/raw", budget)
         return 0
     except Exception as exc:  # noqa: BLE001 - every pull failure leaves a diagnostic
+        extra = {"transport": budget.summary(), "source_base": BASE}
+        if isinstance(exc, DownloadError):
+            extra["download_failures"] = exc.failures
+            extra["download_file"] = exc.name
         diag.emit_failure("pull", exc, output or diag.DEFAULT_OUTPUT, started_at=started_at,
-                          extra={"transport": budget.summary(), "source_base": BASE})
+                          extra=extra)
         return 1
 
 

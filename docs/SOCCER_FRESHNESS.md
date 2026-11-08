@@ -71,29 +71,74 @@ deadlines, regression checks, supplements, corrections) are unchanged.
 | FIFA logical queries | 128 interval splits | `FIFA_MAX_QUERIES` |
 | FIFA physical requests | 192 (128 queries + 64 retries), 600 s wall clock | `FIFA_MAX_REQUESTS`, `FIFA_MAX_ELAPSED_S` |
 | Pull physical requests | 16 (2 files x 2 branches x 4 attempts), 420 s | `PULL_MAX_REQUESTS`, `PULL_MAX_ELAPSED_S` |
+| Publish readback | 8 requests, 90 s | `soccer_publish_verify.verify` |
+| Workflow backstop | job 25 min; steps: install 5, pull 9, distill 3, verify 12, publish 4, publish-verify 4 | `refresh-soccer.yml` `timeout-minutes` |
 
 The physical budget is checked before each request, so nested retries cannot
 multiply past it; running out of budget is a `TransportError(category="budget")`.
+The elapsed budget is a true end-to-end deadline, not a per-connect timeout: the
+socket timeout is clamped to whatever remains (sub-second included, no floor),
+bodies are read in 64 KiB chunks with the deadline re-checked between chunks,
+and a stream still running when the deadline passes fails as
+`category="budget"` / `deadline_exceeded` without retry. A read that completes
+late but inside the deadline is accepted; the next request simply gets the
+remaining time. A retry whose backoff would cross the deadline is refused
+rather than slept through. The workflow `timeout-minutes` values exist only as
+a backstop; if one fires, the run's init record (below) is what gets uploaded.
 A later page that fails after earlier pages succeeded raises; `fetch_fixtures`
 never returns a partial collection, and the attempted query list is preserved
 in the diagnostic because the caller owns the history list.
 
 ### Diagnostics contract
 
-`distillates/soccer/freshness_status.json` (schema 2) is written by whichever
-stage fails — `pull`, `distill`, `verify` — and by `verify` on success. Fields:
+`distillates/soccer/freshness_status.json` (schema 2) is **run-scoped**. The
+first step after checkout (system `python3`, before any dependency install)
+runs `soccer_diagnostics.py --init`, which replaces the committed file (the
+previous successful run's) with this run's `state: in_progress` record carrying
+`run_id`, `commit`, `started_at`, `last_good` and a `superseded_record` note.
+From that point the artifact can never be a stale success, even if `pip
+install` fails. Later steps (`--if-missing`, `--annotate`, publish verification)
+accept an existing record as current only if it parses, has `schema_version: 2`
+and carries this run's `GITHUB_RUN_ID`; anything else is replaced and noted
+under `rejected_record` (`malformed` / `schema_mismatch` / `wrong_run`).
+
+The file is then overwritten by whichever stage fails — `pull`, `distill`,
+`verify` — and by `verify` on success. Fields:
 `stage`, `state`, `publish_allowed`, `error_category`
 (`transport:<transport|http_permanent|budget|tls>`, `invalid_response`,
 `validation`, `schema`, `io`, `unexpected:<Type>`, `diagnostic_gap`),
 `errors`, `traceback` (tail), `started_at`/`finished_at`, `commit`, `run_id`,
 `run_attempt`, `last_good` (previous published vintage), `source_data_through`,
 `source_rows_total`, `fixture_queries`, `fixture_query_count`, and `transport`
-(physical request count, elapsed, per-attempt history with sanitized URLs). The
-workflow writes a `diagnostic_gap` record if no stage produced one, annotates a
-publish failure, and uploads with `if-no-files-found: error`. `verify` also
+(physical request count, elapsed, per-attempt history with sanitized URLs). A
+`pull` failure is typed: `error_category` is `transport:<category>` of the last
+branch tried, with `failed_url`, `failed_url_attempts` and a per-branch
+`download_failures` list (`http_permanent`, `tls`, `budget`, `transport`); only
+a complete download that fails CSV validation is `validation`. The workflow
+writes a `diagnostic_gap` record if no stage produced one and uploads with
+`if-no-files-found: error`. `verify` also
 checks that `team_profiles.json` and `wc_base_rates.json` agree with `meta.json`
 (as_of, data_through, team count, W/D/L totals) and that no distillate contains
 NaN/Infinity.
+
+### Publication verification
+
+On `main`, after the commit/push step — whatever its outcome —
+`soccer_publish_verify.py` records what actually happened, never what was
+intended: it reads the remote `main` head with `git ls-remote`, and reads the
+committed `meta.json` and `team_profiles.json` back from the immutable
+`raw.githubusercontent.com/<repo>/<sha>/…` URL through the bounded transport.
+`published` is `true` only when the remote head is (or contains) this run's
+commit **and** the readback is byte-identical to the local files; `"unchanged"`
+when nothing was committed and the remote base's `meta.json` reads back equal
+to the previously published meta; `false` when the push did not land and the
+remote still serves the base commit (with `last_good_verified` set only if the
+base meta read back equal — "last-good remains published" is an observation,
+not an assumption); and `"unknown"` whenever the remote head is unreadable,
+readback mismatches, or the remote moved to a commit whose relationship to
+ours cannot be established. The step exits non-zero if the push step reported
+success but publication could not be confirmed. The result is merged into the
+run's status record under `publish` / `published` / `last_good_verified`.
 
 ### Primary-source cadence and licensing (verified 2026-11-08)
 

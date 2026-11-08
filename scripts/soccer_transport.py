@@ -16,6 +16,11 @@ Limits (also documented in docs/SOCCER_FRESHNESS.md):
 * A budget bounds the total number of physical requests and the total elapsed
   wall-clock time for a whole stage, independent of per-URL attempts, so nested
   retries can never multiply into an unbounded request count.
+* The elapsed budget is a true end-to-end deadline: the socket timeout is
+  clamped to the remaining budget (sub-second remainders included, no floor),
+  bodies are read in chunks with the deadline re-checked between chunks, and a
+  read that is still streaming when the deadline passes fails with
+  ``category="budget"`` (``deadline_exceeded``) and is not retried.
 
 TLS verification stays on: ``urllib.request.urlopen`` is used with its default
 verifying SSL context and no override is offered here.
@@ -38,6 +43,7 @@ BACKOFF_FACTOR = 2.0
 BACKOFF_CAP_S = 20.0
 RETRY_AFTER_CAP_S = 60.0
 RETRYABLE_STATUS = frozenset({408, 425, 429, 500, 502, 503, 504})
+READ_CHUNK_BYTES = 65536
 USER_AGENT = "sports-intel-spine/soccer-refresh (+https://github.com/calenb2/sports-intel-spine)"
 SECRET_QUERY_KEYS = ("token", "key", "apikey", "api_key", "signature", "sig", "secret",
                      "password", "auth", "access_token", "x-apisports-key")
@@ -57,6 +63,10 @@ class TransportError(Exception):
 
 class InvalidResponse(ValueError):
     """A complete response was received but its content is unusable."""
+
+
+class DeadlineExceeded(Exception):
+    """Raised inside a streaming read when the stage deadline passes."""
 
 
 def sanitize_url(url):
@@ -145,8 +155,26 @@ def _is_tls_failure(exc):
         isinstance(reason, ssl.SSLError) and "CERTIFICATE" in str(reason).upper())
 
 
+def _read_with_deadline(response, budget):
+    """Read the whole body in chunks, failing fast if the stage deadline passes mid-stream.
+
+    A slow but steady stream can keep a per-operation socket timeout from ever
+    firing; this check turns the budget into a real end-to-end limit.
+    """
+    parts = []
+    while True:
+        if budget.remaining_time() <= 0:
+            raise DeadlineExceeded(f"deadline passed after {sum(map(len, parts))} bytes streamed")
+        chunk = response.read(READ_CHUNK_BYTES)
+        if not chunk:
+            return b"".join(parts)
+        parts.append(chunk)
+
+
 def _classify(exc):
     """Return (retryable, label, retry_after_seconds) for an exception."""
+    if isinstance(exc, DeadlineExceeded):
+        return False, "deadline_exceeded", None
     if isinstance(exc, HTTPError):
         if exc.code in RETRYABLE_STATUS:
             return True, f"http_{exc.code}", _retry_after_seconds(exc.headers)
@@ -189,10 +217,13 @@ def fetch_bytes(url, budget, *, timeout=45, max_attempts=MAX_ATTEMPTS_PER_URL,
         started = time.monotonic()
         try:
             request = Request(url, headers=request_headers)
-            effective_timeout = max(1.0, min(float(timeout), budget.remaining_time()))
+            remaining = budget.remaining_time()
+            if remaining <= 0:
+                raise DeadlineExceeded("deadline passed before connect")
+            effective_timeout = min(float(timeout), remaining)   # no floor: sub-second is honoured
             with opener(request, timeout=effective_timeout) as response:
                 status = getattr(response, "status", None) or response.getcode()
-                body = response.read()
+                body = _read_with_deadline(response, budget)
                 declared = response.headers.get("Content-Length") if response.headers else None
             if declared is not None and declared.isdigit() and int(declared) != len(body):
                 raise IncompleteRead(body, int(declared) - len(body))
@@ -208,8 +239,9 @@ def fetch_bytes(url, budget, *, timeout=45, max_attempts=MAX_ATTEMPTS_PER_URL,
                           detail=str(exc)[:300], retryable=retryable,
                           elapsed_ms=round((time.monotonic() - started) * 1000))
             if not retryable:
-                category = "tls" if label == "tls_verification" else (
-                    "http_permanent" if label.startswith("http_") else "transport")
+                category = ("tls" if label == "tls_verification" else
+                            "budget" if label == "deadline_exceeded" else
+                            "http_permanent" if label.startswith("http_") else "transport")
                 raise TransportError(f"{label} for {shown} (not retryable)", category=category,
                                      url=shown, attempts=attempt, history=budget.history,
                                      last_error=exc) from exc
