@@ -1,42 +1,90 @@
 {
   "schema_version": 1,
-  "reviewed_on": "2026-11-06",
+  "reviewed_on": "2026-11-08",
   "valid_from": "2026-09-21",
   "valid_through": "2026-12-31",
   "sources": [
     "https://inside.fifa.com/tournament-organisation/international-match-calendars",
-    "https://www.the-aiff.com/article/naushad-moosa-names-28-player-squad-for-saff-championship-2026"
+    "https://www.the-aiff.com/article/naushad-moosa-names-28-player-squad-for-saff-championship-2026",
+    "https://www.thedailystar.net/sports/football/news/saff-championship-2026-all-you-need-know-4315616"
   ],
   "periods": [
-    {"name": "FIFA September/October window", "start": "2026-09-21", "end": "2026-10-06"},
-    {"name": "SAFF Championship", "start": "2026-11-05", "end": "2026-11-17"},
-    {"name": "FIFA November window", "start": "2026-11-09", "end": "2026-11-17"}
+    {
+      "name": "FIFA September/October window",
+      "start": "2026-09-21",
+      "end": "2026-10-06"
+    },
+    {
+      "name": "SAFF Championship",
+      "start": "2026-11-05",
+      "end": "2026-11-17"
+    },
+    {
+      "name": "FIFA November window",
+      "start": "2026-11-09",
+      "end": "2026-11-17"
+    }
   ],
   "fixture_corrections": [
     {
-      "id": "adq98i7cfbioqcfk7t8bbuzh0", "date": "2026-09-30",
-      "teams": ["Botswana", "Mozambique"], "action": "exclude",
+      "id": "adq98i7cfbioqcfk7t8bbuzh0",
+      "date": "2026-09-30",
+      "teams": [
+        "Botswana",
+        "Mozambique"
+      ],
+      "action": "exclude",
       "reason": "Both teams were U23; FIFA feed incorrectly labels senior teams.",
       "source": "https://www.fmf.co.mz/index.php/news/details/1140"
     },
     {
-      "id": "72td9n51t974untmwgrsp3is", "date": "2026-11-04",
-      "teams": ["Bangladesh", "Sri Lanka"], "action": "reschedule", "new_date": "2026-11-11",
+      "id": "72td9n51t974untmwgrsp3is",
+      "date": "2026-11-04",
+      "teams": [
+        "Bangladesh",
+        "Sri Lanka"
+      ],
+      "action": "reschedule",
+      "new_date": "2026-11-11",
       "reason": "Revised SAFF fixture; original November 4 listing is obsolete.",
       "source": "https://www.facebook.com/SLinBangladesh/posts/1436402875345705/"
+    },
+    {
+      "id": "7llr2hcj6fmheky7osuxe49g",
+      "date": "2026-11-07",
+      "teams": [
+        "Sri Lanka",
+        "Bhutan"
+      ],
+      "action": "reschedule",
+      "new_date": "2026-11-08",
+      "reason": "FIFA still carries the September provisional date; the published tournament schedule has Sri Lanka-Bhutan on Sunday 8 November, 20:00 Dhaka (14:00 UTC), same day as Maldives-Pakistan.",
+      "source": "https://www.thedailystar.net/sports/football/news/saff-championship-2026-all-you-need-know-4315616"
     }
   ],
   "known_results": [
     {
-      "date": "2026-10-04", "teams": ["Bahamas", "United States Virgin Islands"],
+      "date": "2026-10-04",
+      "teams": [
+        "Bahamas",
+        "United States Virgin Islands"
+      ],
       "source": "https://www.concacaf.com/competitions/nations-league/news/last-minute-victory-for-aruba-in-group-b"
     },
     {
-      "date": "2026-11-05", "teams": ["Bhutan", "Bangladesh"],
+      "date": "2026-11-05",
+      "teams": [
+        "Bhutan",
+        "Bangladesh"
+      ],
       "source": "https://saffederation.org/match-results/"
     },
     {
-      "date": "2026-11-05", "teams": ["India", "Pakistan"],
+      "date": "2026-11-05",
+      "teams": [
+        "India",
+        "Pakistan"
+      ],
       "source": "https://www.the-aiff.com/article/india-defeat-pakistan-in-saff-championship-opener"
     }
   ]

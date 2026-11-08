@@ -35,10 +35,87 @@ identifies the September 30 Botswana match as U23](https://www.fmf.co.mz/index.p
 so that incorrectly classified senior witness is excluded. [Sri Lanka's High
 Commission's match schedule](https://www.facebook.com/SLinBangladesh/posts/1436402875345705/)
 places Bangladesh–Sri Lanka on November 11, replacing FIFA's stale November 4
-listing. The corrected November 5 SAFF opening date follows
+listing. On November 8 a third correction moved Sri Lanka–Bhutan from FIFA's
+provisional November 7 to the [published schedule's November 8](https://www.thedailystar.net/sports/football/news/saff-championship-2026-all-you-need-know-4315616),
+so its deadline is November 11 00:00 UTC alongside Maldives–Pakistan. The corrected November 5 SAFF opening date follows
 [AIFF's October 30 squad announcement](https://www.the-aiff.com/article/naushad-moosa-names-28-player-squad-for-saff-championship-2026).
 Corrections match the exact fixture ID, original date and teams; changed identity
 or a conflicting completed status requires review.
+
+## November 8, 2026 incident
+
+[Run 42436558372](https://github.com/calenb2/sports-intel-spine/actions/runs/42436558372)
+pulled and distilled normally, then the independent FIFA check died with
+`http.client.IncompleteRead(305950 bytes read)`: the API closed a chunked
+response early on one of the ~50 split-interval pages. `get_json()` had no
+retry, `IncompleteRead` is an `HTTPException` (not in the handler's list), so the
+exception escaped before any status file was written, and the artifact step
+accepted "no files found". Publication was correctly skipped; the diagnostic gap
+was the defect. The same truncation recurred on 1 of 6 local replays on
+November 8 (765,457 bytes read) and was absorbed by a single retry.
+
+Repair (this document's version): every request goes through
+`scripts/soccer_transport.py`, every stage writes a diagnostic on failure, and
+the workflow treats a missing diagnostic as an error. Policy semantics (grace,
+deadlines, regression checks, supplements, corrections) are unchanged.
+
+### Transport bounds
+
+| Bound | Value | Where |
+|---|---|---|
+| Attempts per URL | 4 | `MAX_ATTEMPTS_PER_URL` |
+| Backoff | 1 s, x2, cap 20 s, +/-25 % jitter | `_backoff` |
+| `Retry-After` | honoured (seconds or HTTP-date), cap 60 s | `_retry_after_seconds` |
+| Retried | truncated/short/empty bodies, timeouts, resets, DNS/socket errors, HTTP 408/425/429/500/502/503/504 | `_classify` |
+| Not retried | other 4xx, TLS verification failures, complete-but-invalid JSON | `_classify`, `InvalidResponse` |
+| FIFA logical queries | 128 interval splits | `FIFA_MAX_QUERIES` |
+| FIFA physical requests | 192 (128 queries + 64 retries), 600 s wall clock | `FIFA_MAX_REQUESTS`, `FIFA_MAX_ELAPSED_S` |
+| Pull physical requests | 16 (2 files x 2 branches x 4 attempts), 420 s | `PULL_MAX_REQUESTS`, `PULL_MAX_ELAPSED_S` |
+
+The physical budget is checked before each request, so nested retries cannot
+multiply past it; running out of budget is a `TransportError(category="budget")`.
+A later page that fails after earlier pages succeeded raises; `fetch_fixtures`
+never returns a partial collection, and the attempted query list is preserved
+in the diagnostic because the caller owns the history list.
+
+### Diagnostics contract
+
+`distillates/soccer/freshness_status.json` (schema 2) is written by whichever
+stage fails — `pull`, `distill`, `verify` — and by `verify` on success. Fields:
+`stage`, `state`, `publish_allowed`, `error_category`
+(`transport:<transport|http_permanent|budget|tls>`, `invalid_response`,
+`validation`, `schema`, `io`, `unexpected:<Type>`, `diagnostic_gap`),
+`errors`, `traceback` (tail), `started_at`/`finished_at`, `commit`, `run_id`,
+`run_attempt`, `last_good` (previous published vintage), `source_data_through`,
+`source_rows_total`, `fixture_queries`, `fixture_query_count`, and `transport`
+(physical request count, elapsed, per-attempt history with sanitized URLs). The
+workflow writes a `diagnostic_gap` record if no stage produced one, annotates a
+publish failure, and uploads with `if-no-files-found: error`. `verify` also
+checks that `team_profiles.json` and `wc_base_rates.json` agree with `meta.json`
+(as_of, data_through, team count, W/D/L totals) and that no distillate contains
+NaN/Infinity.
+
+### Primary-source cadence and licensing (verified 2026-11-08)
+
+- `martj42/international_results` states **no update schedule**; results are
+  added by community pull requests. On November 8 the CSV still ended at
+  2026-10-06 (49,940 rows). This workflow polls 4x daily and enforces a two-day
+  missing-result deadline, so **the primary source alone cannot satisfy the
+  completeness policy during a window**; `awaiting_results` -> `blocked` after
+  grace is the designed, truthful outcome, not a bug. The three supplements
+  cover verified omissions only.
+- The repository `LICENSE` file is **CC0 1.0 Universal**. `MANIFEST.json` and
+  `SOURCES.csv` previously said CC BY 4.0 and are corrected. CC0 covers the
+  martj42 rows only; it confers nothing on FIFA or any other provider's data.
+- Candidate current-results feeds (none adopted; each needs an account, a key,
+  and in two cases a rights decision — outside this repair's authorization):
+  API-Football (free 100 req/day, all competitions on all plans per its pricing
+  page; terms page not retrievable on 2026-11-08, publication rights unverified),
+  Sportmonks (caching inside a product allowed, raw-feed redistribution needs
+  written approval; SAFF men's coverage unconfirmed), football-data.org (no SAFF
+  or friendlies listed), OpenFootball internationals (martj42 mirror, not
+  independent). FIFA stays a witness: it listed Sri Lanka-Bhutan on the
+  September provisional date (Nov 7) when the published schedule says Nov 8.
 
 ## Publication policy
 
@@ -68,8 +145,8 @@ or a conflicting completed status requires review.
    Other unclassifiable potential senior fixtures fail verification.
 6. The feed caps responses at 500. Recursively split the requested interval until
    every response is complete. Validate bounds and IDs; fail on missing pagination
-   metadata, malformed responses, HTTP failures, saturation at a single second,
-   or a 128-request budget. Require at least one completed fixture overlapping
+   metadata, malformed responses, exhausted transport retries/budgets (see
+   "Transport bounds"), saturation at a single second, or the 128-query budget. Require at least one completed fixture overlapping
    the CSV so an empty/broken feed cannot certify a break. Refuse sources older
    than 180 days rather than issuing unbounded requests.
 7. Compare fixture date and both normalized team names, ignoring home/away order.
@@ -85,9 +162,11 @@ or a conflicting completed status requires review.
    Known official result witnesses apply even if FIFA omits the match.
 
 `freshness_status.json` records state, unchanged data vintage, pending and overdue
-fixtures, deadlines, calendar coverage and query URLs. It appears in the Actions
-summary and as an artifact on either guard outcome. A failed pull/distill cannot
-upload a stale prior success: the workflow clears the previous diagnostic first.
+fixtures, deadlines, calendar coverage, query URLs and the transport/diagnostic
+fields above. It appears in the Actions summary and as an artifact on every
+outcome; a failed pull/distill writes its own stage record rather than leaving
+nothing, and the workflow clears the previous run's file first so a stale
+success can never be uploaded.
 Only successful main-branch runs commit soccer raw files and distillates. Branch
 dispatches can verify without committing or publishing.
 
