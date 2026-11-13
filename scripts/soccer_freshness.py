@@ -6,19 +6,25 @@ and a reviewed calendar. FIFA is a witness, not a replacement results dataset.
 import argparse
 import csv
 import json
-import os
 import sys
 import unicodedata
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlencode
-from urllib.request import urlopen
+
+import soccer_diagnostics as diag
+from soccer_transport import Budget, InvalidResponse, TransportError, fetch_json
 
 ROOT = Path(__file__).resolve().parents[1]
 FIFA_URL = "https://api.fifa.com/api/v3/calendar/matches"
 RESULT_GRACE_DAYS = 2  # Allow two complete UTC calendar days after the match date.
 ACTIVE_LAG_DAYS = 7
 MAX_LOOKBACK_DAYS = 180
+FIFA_MAX_QUERIES = 128        # distinct logical queries (interval splits)
+FIFA_MAX_REQUESTS = 192       # physical requests incl. retries: 128 queries + 64 retries
+FIFA_MAX_ELAPSED_S = 600      # wall-clock budget for the whole verification fetch
+REQUIRED_COLUMNS = ("date", "home_team", "away_team", "home_score", "away_score",
+                    "tournament", "neutral")
 ALIASES = {
     "usa": "united states", "korea republic": "south korea",
     "korea dpr": "north korea", "ir iran": "iran", "cote d'ivoire": "ivory coast",
@@ -61,17 +67,23 @@ def fixture_present(fixture, matches):
 def read_results(path, today):
     with path.open(encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
-        required = {"date", "home_team", "away_team", "home_score", "away_score"}
-        if not required.issubset(reader.fieldnames or []):
+        if not set(REQUIRED_COLUMNS).issubset(reader.fieldnames or []):
             raise ValueError("results.csv missing required columns")
         matches = []
-        for row in reader:
+        for number, row in enumerate(reader, start=2):
+            # DictReader fills short rows with None and parks extra cells under None.
+            if None in row or any(v is None for v in row.values()):
+                raise ValueError(f"Malformed/short row at line {number} in results.csv")
             day = iso(row["date"])
             if day > today:
                 raise ValueError("Future result date in results.csv")
             for field in ("home_score", "away_score"):
                 if not row[field].isdigit():
                     raise ValueError("Missing/invalid completed-result score")
+            if not row["tournament"].strip():
+                raise ValueError(f"Missing tournament at line {number} in results.csv")
+            if row["neutral"] not in ("TRUE", "FALSE"):
+                raise ValueError(f"Invalid neutral flag at line {number} in results.csv")
             key = match_key(day, row["home_team"], row["away_team"])
             # Historic sources can contain two matches between the same teams
             # on one date. Preserve row count; keys are only fixture witnesses.
@@ -167,21 +179,29 @@ def calendar_periods(calendar, today):
     return sorted(periods)
 
 
-def get_json(url):
-    with urlopen(url, timeout=45) as response:
-        return json.load(response)
+def new_fifa_budget():
+    return Budget(max_requests=FIFA_MAX_REQUESTS, max_elapsed_s=FIFA_MAX_ELAPSED_S)
 
 
-def fetch_fixtures(start, end, fetch=get_json):
+def get_json(url, budget=None):
+    """Fetch one FIFA page through the bounded transport (see soccer_transport)."""
+    return fetch_json(url, budget if budget is not None else new_fifa_budget())
+
+
+def fetch_fixtures(start, end, fetch=get_json, history=None):
     """Split date ranges until *all* pages fit; FIFA currently caps at 500.
 
     Do not rely on undocumented team filters (observed to be silently ignored).
     Saturation at one second or an absent pagination marker fails closed.
+    ``history`` (a list) receives every logical query URL as it is issued, so a
+    caller keeps the attempted-query trail even when a later page raises. The
+    function never returns a partial collection: any failure propagates.
     """
-    by_id, urls = {}, []
+    by_id = {}
+    urls = history if history is not None else []
 
     def visit(a, b):
-        if len(urls) >= 128:
+        if len(urls) >= FIFA_MAX_QUERIES:
             raise ValueError("FIFA request budget exceeded")
         url = FIFA_URL + "?" + urlencode({
             "from": a.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -342,49 +362,91 @@ def evaluate(matches, meta, previous, calendar, fixtures, today):
     }
 
 
+def validate_distillates(meta, profiles_path, base_rates_path):
+    """Generated distillates must agree with the metadata that describes them."""
+    profiles = json.loads(profiles_path.read_text(encoding="utf-8"))
+    base_rates = json.loads(base_rates_path.read_text(encoding="utf-8"))
+    if profiles.get("as_of") != meta["as_of"] or base_rates.get("as_of") != meta["as_of"]:
+        raise ValueError("Distillate as_of disagrees with meta.json")
+    if profiles.get("data_through") != meta["data_through"]:
+        raise ValueError("team_profiles data_through disagrees with meta.json")
+    teams = profiles.get("teams")
+    if not isinstance(teams, dict) or len(teams) != meta["teams_profiled"]:
+        raise ValueError("team_profiles team count disagrees with meta.json")
+    for name, profile in teams.items():
+        if not name or profile.get("gp", 0) < 1:
+            raise ValueError(f"Profile for {name!r} has no games")
+        if profile["w"] + profile["d"] + profile["l"] != profile["gp"]:
+            raise ValueError(f"Profile for {name!r} has inconsistent W/D/L totals")
+    # allow_nan=False rejects NaN/Infinity, which json.dumps would otherwise emit
+    # as tokens that are not valid JSON for consumers.
+    json.dumps([profiles, base_rates, meta], allow_nan=False)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--previous-meta", type=Path, required=True)
     parser.add_argument("--results", type=Path, default=ROOT / "data/soccer/raw/results.csv")
     parser.add_argument("--meta", type=Path, default=ROOT / "distillates/soccer/meta.json")
+    parser.add_argument("--profiles", type=Path, default=ROOT / "distillates/soccer/team_profiles.json")
+    parser.add_argument("--base-rates", type=Path, default=ROOT / "distillates/soccer/wc_base_rates.json")
     parser.add_argument("--calendar", type=Path, default=ROOT / "data/soccer/calendar.json")
     parser.add_argument("--supplements", type=Path, default=ROOT / "data/soccer/result_supplements.json")
     parser.add_argument("--output", type=Path, default=ROOT / "distillates/soccer/freshness_status.json")
     args = parser.parse_args(argv)
     today = datetime.now(timezone.utc).date()
+    started_at = diag.utc_now()
     urls = []
+    budget = new_fifa_budget()
+    provenance = {}
+
+    def extras():
+        return {"fixture_source": FIFA_URL, "fixture_queries": list(urls),
+                "fixture_query_count": len(urls), "transport": budget.summary(),
+                "source_data_through": provenance.get("source_data_through"),
+                "source_rows_total": provenance.get("source_rows_total")}
+
     try:
-        calendar = json.loads(args.calendar.read_text(encoding="utf-8"))
-        calendar_periods(calendar, today)
-        merged, provenance = merged_result_rows(args.results, args.supplements, today)
-        matches = [match_key(iso(r["date"]), r["home_team"], r["away_team"]) for r in merged]
-        meta = json.loads(args.meta.read_text(encoding="utf-8"))
-        if any(meta.get(k) != v for k, v in provenance.items()):
-            raise ValueError("Distillate source/supplement provenance mismatch")
-        # Supplements must not shorten the independent audit of a stalled source.
-        latest = iso(provenance["source_data_through"])
-        if (today - latest).days > MAX_LOOKBACK_DAYS:
-            raise ValueError("Results exceed maximum verifiable lookback")
-        rows, urls = fetch_fixtures(latest - timedelta(days=7), today)
-        result = evaluate(matches, meta,
-                          json.loads(args.previous_meta.read_text(encoding="utf-8")),
-                          calendar, correct_fixtures(senior_fixtures(rows), calendar), today)
-        result["unidentified_scheduled_placeholders"] = sum(
-            row.get("Home") is None and row.get("Away") is None
-            and row.get("MatchStatus") == 1 for row in rows)
-    except (ValueError, KeyError, TypeError, OSError) as exc:
-        result = {"as_of": today.isoformat(), "state": "blocked", "publish_allowed": False,
-                  "errors": [f"Freshness verification failed: {exc}"]}
-    result["fixture_source"] = FIFA_URL
-    result["fixture_queries"] = urls
-    text = json.dumps(result, indent=2, default=str) + "\n"
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(text, encoding="utf-8")
-    print(text)
-    if os.environ.get("GITHUB_STEP_SUMMARY"):
-        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
-            handle.write("## Soccer freshness\n```json\n" + text + "```\n")
-    return 0 if result["publish_allowed"] else 1
+        try:
+            calendar = json.loads(args.calendar.read_text(encoding="utf-8"))
+            calendar_periods(calendar, today)
+            merged, provenance = merged_result_rows(args.results, args.supplements, today)
+            matches = [match_key(iso(r["date"]), r["home_team"], r["away_team"]) for r in merged]
+            meta = json.loads(args.meta.read_text(encoding="utf-8"))
+            if any(meta.get(k) != v for k, v in provenance.items()):
+                raise ValueError("Distillate source/supplement provenance mismatch")
+            validate_distillates(meta, args.profiles, args.base_rates)
+            # Supplements must not shorten the independent audit of a stalled source.
+            latest = iso(provenance["source_data_through"])
+            if (today - latest).days > MAX_LOOKBACK_DAYS:
+                raise ValueError("Results exceed maximum verifiable lookback")
+            rows, _ = fetch_fixtures(latest - timedelta(days=7), today,
+                                     fetch=lambda url: get_json(url, budget), history=urls)
+            result = evaluate(matches, meta,
+                              json.loads(args.previous_meta.read_text(encoding="utf-8")),
+                              calendar, correct_fixtures(senior_fixtures(rows), calendar), today)
+            result["unidentified_scheduled_placeholders"] = sum(
+                row.get("Home") is None and row.get("Away") is None
+                and row.get("MatchStatus") == 1 for row in rows)
+            result.update(diag.base_record("verify", today))
+            result["started_at"] = started_at
+            result["finished_at"] = diag.utc_now()
+            result["last_good"] = diag.last_good_summary(args.previous_meta)
+            result.update(extras())
+            text = diag.write_record(result, args.output)
+            print(text)
+            return 0 if result["publish_allowed"] else 1
+        except (ValueError, KeyError, TypeError, OSError, TransportError, InvalidResponse) as exc:
+            # Expected failure classes: validation, schema, I/O, bounded transport.
+            diag.emit_failure("verify", exc, args.output, today=today,
+                              previous_meta=args.previous_meta, started_at=started_at,
+                              extra=extras())
+            return 1
+    except Exception as exc:  # noqa: BLE001 - last resort so a diagnostic always exists
+        diag.emit_failure("verify", exc, args.output, today=today,
+                          previous_meta=args.previous_meta, started_at=started_at,
+                          extra=extras())
+        return 1
 
 
 if __name__ == "__main__":

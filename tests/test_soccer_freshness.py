@@ -2,14 +2,41 @@ import json
 import sys
 import tempfile
 import unittest
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import soccer_freshness as s
+import soccer_transport as transport
 import pull_soccer as pull
+from http.client import IncompleteRead
+from urllib.error import HTTPError
+
+
+class FakeResponse:
+    """Minimal stand-in for an http.client response used by the transport."""
+
+    def __init__(self, body, status=200, headers=None):
+        self.body, self.status = body, status
+        self.headers = headers or {}
+
+    def read(self, n=-1):
+        if n is None or n < 0:
+            data, self.body = self.body, b""
+            return data
+        data, self.body = self.body[:n], self.body[n:]
+        return data
+
+    def getcode(self):
+        return self.status
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
 
 
 def fixture(day="2026-10-06", home="USA", away="Canada", status=0):
@@ -248,11 +275,11 @@ class CorrectionsTests(unittest.TestCase):
             self.assertEqual(provenance, {"source_rows_total": 1,
                                          "source_data_through": "2026-10-06", "supplemental_rows": 1})
             # Upstream catches up with reversed home/away order and equal scores.
-            raw.write_text(InputTests.csv + "2026-11-05,India,Pakistan,3,2\n")
+            raw.write_text(InputTests.csv + "2026-11-05,India,Pakistan,3,2,SAFF Championship,Dhaka,Bangladesh,TRUE\n")
             rows, provenance = s.merged_result_rows(raw, supplement, date(2026, 11, 6))
             self.assertEqual(len(rows), 2)
             self.assertEqual(provenance["supplemental_rows"], 0)
-            raw.write_text(InputTests.csv + "2026-11-05,India,Pakistan,4,2\n")
+            raw.write_text(InputTests.csv + "2026-11-05,India,Pakistan,4,2,SAFF Championship,Dhaka,Bangladesh,TRUE\n")
             with self.assertRaisesRegex(ValueError, "conflict"):
                 s.merged_result_rows(raw, supplement, date(2026, 11, 6))
             raw.write_text(InputTests.csv)
@@ -274,7 +301,8 @@ class CorrectionsTests(unittest.TestCase):
 
 
 class InputTests(unittest.TestCase):
-    csv = "date,home_team,away_team,home_score,away_score\n2026-10-06,USA,Canada,1,0\n"
+    header = "date,home_team,away_team,home_score,away_score,tournament,city,country,neutral\n"
+    csv = header + "2026-10-06,USA,Canada,1,0,Friendly,Toronto,Canada,FALSE\n"
 
     def test_csv_validation(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -284,7 +312,13 @@ class InputTests(unittest.TestCase):
             for body in ("", "date\n2026-10-06\n", self.csv.replace("1,0", ",0"),
                          self.csv.replace("1,0", "-1,0"), self.csv.replace("1,0", "1.5,0"),
                          self.csv.replace("2026-10-06", "2027-10-06"),
-                         self.csv.replace("2026-10-06", "not-a-date")):
+                         self.csv.replace("2026-10-06", "not-a-date"),
+                         # short row (missing trailing columns) and over-long row
+                         self.header + "2026-10-06,USA,Canada,1,0\n",
+                         self.csv.replace("FALSE\n", "FALSE,extra\n"),
+                         # old five-column layout no longer satisfies the distiller's needs
+                         "date,home_team,away_team,home_score,away_score\n2026-10-06,USA,Canada,1,0\n",
+                         self.csv.replace("Friendly", ""), self.csv.replace("FALSE", "maybe")):
                 path.write_text(body)
                 with self.subTest(body=body), self.assertRaises(ValueError):
                     s.read_results(path, date(2026, 11, 6))
@@ -309,10 +343,53 @@ class InputTests(unittest.TestCase):
             self.assertFalse((raw / "results.csv.tmp").exists())
 
     def test_download_fallback_and_total_failure(self):
-        with patch.object(pull, "urlopen", side_effect=OSError("offline")) as fetch:
+        # A retryable error is retried up to the per-URL cap on each branch, then
+        # the next branch is tried; both exhausted is a ValueError, never a cached file.
+        with patch.object(pull, "urlopen", side_effect=OSError("offline")) as fetch, \
+                patch.object(transport.time, "sleep"):
             with self.assertRaisesRegex(ValueError, "Cannot download"):
                 pull.download("results.csv")
-            self.assertEqual(fetch.call_count, 2)
+            self.assertEqual(fetch.call_count, 2 * transport.MAX_ATTEMPTS_PER_URL)
+
+    def test_download_permanent_404_falls_through_to_next_branch(self):
+        calls = []
+
+        def opener(request, timeout):
+            calls.append(request.full_url)
+            if "/master/" in request.full_url:
+                raise HTTPError(request.full_url, 404, "Not Found", {}, None)
+            return FakeResponse(b"date,home_team\n")
+
+        with patch.object(pull, "urlopen", opener):
+            body, url = pull.download("results.csv")
+        self.assertEqual(body, b"date,home_team\n")
+        self.assertTrue(url.endswith("/main/results.csv"))
+        self.assertEqual(len(calls), 2)  # 404 is permanent: one request per branch
+
+    def test_download_truncated_then_recovers(self):
+        attempts = []
+
+        def opener(request, timeout):
+            attempts.append(1)
+            if len(attempts) == 1:
+                raise IncompleteRead(b"partial", 100)
+            return FakeResponse(InputTests.csv.encode())
+
+        with patch.object(pull, "urlopen", opener), patch.object(transport.time, "sleep"):
+            body, _ = pull.download("results.csv")
+        self.assertEqual(body, InputTests.csv.encode())
+        self.assertEqual(len(attempts), 2)
+
+    def test_pull_cli_failure_writes_pull_stage_diagnostic(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "status.json"
+            with patch.object(pull, "download", side_effect=ValueError("both branches failed")):
+                self.assertEqual(pull.main(raw=Path(folder), output=output), 1)
+            record = json.loads(output.read_text())
+            self.assertEqual(record["stage"], "pull")
+            self.assertEqual(record["error_category"], "validation")
+            self.assertFalse(record["publish_allowed"])
+            self.assertIn("transport", record)
 
     def test_cli_failure_writes_diagnostics_and_returns_nonzero(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -320,7 +397,13 @@ class InputTests(unittest.TestCase):
             missing = str(Path(folder) / "missing.json")
             self.assertEqual(s.main(["--previous-meta", missing, "--calendar", missing,
                                      "--output", str(output)]), 1)
-            self.assertFalse(json.loads(output.read_text())["publish_allowed"])
+            record = json.loads(output.read_text())
+            self.assertFalse(record["publish_allowed"])
+            self.assertEqual(record["stage"], "verify")
+            self.assertEqual(record["error_category"], "io")
+            self.assertFalse(record["last_good"]["available"])
+            self.assertEqual(record["fixture_queries"], [])
+            self.assertIn("transport", record)
 
 
 if __name__ == "__main__":
