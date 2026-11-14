@@ -1,8 +1,8 @@
 {
-  "checked_on_utc": "2026-11-13",
+  "checked_on_utc": "2026-11-14",
   "phase": "offseason",
   "data_through": "2026-10-28",
-  "data_age_days": 16,
+  "data_age_days": 17,
   "freshness": "last_completed_season_retained",
   "active_season_max_lag_days": 3,
   "profile_season": 2026,
@@ -14,7 +14,7 @@
   "next_regular_season_date_basis": "MLB schedule",
   "next_spring_training_date_basis": "MLB schedule",
   "automatic_regular_season_check_utc": "2027-03-25T09:00:00Z",
-  "next_schedule_check_utc": "2026-11-14T09:00:00Z",
+  "next_schedule_check_utc": "2026-11-15T09:00:00Z",
   "schedule_policy": "Daily 09:00 UTC recheck remains enabled; restart dates are officialDate calendar dates, not first-pitch times. GitHub cron may run late.",
   "spring_training_in_ratings": false,
   "sources": [
@@ -25,5 +25,5 @@
     "https://statsapi.mlb.com/api/v1/seasons/2026?sportId=1",
     "https://statsapi.mlb.com/api/v1/seasons/2027?sportId=1"
   ],
-  "checked_at_utc": "2026-11-13T16:56:03.591465+00:00"
+  "checked_at_utc": "2026-11-14T15:32:05.590446+00:00"
 }
