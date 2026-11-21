@@ -15,44 +15,95 @@ permissions:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    # Backstop for the in-script budgets (pull 420 s + verify 600 s + publish
+    # verification 90 s + setup). If this fires, the init record below is what
+    # gets uploaded, so the run is still diagnosable.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+
+      # First thing after checkout, before any dependency install: replace the
+      # committed status file (the previous successful run's) with THIS run's
+      # start record. From here on the artifact can never be a stale success.
+      # Uses the runner's system python3 (stdlib only) on purpose.
+      - name: Initialize run diagnostics
+        run: |
+          cp distillates/soccer/meta.json "$RUNNER_TEMP/soccer-previous-meta.json"
+          python3 scripts/soccer_diagnostics.py --init --stage workflow \
+            --message "run started; no stage has reported yet" \
+            --previous-meta "$RUNNER_TEMP/soccer-previous-meta.json"
+          echo "base_head=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install deps
+        timeout-minutes: 5
         run: pip install -r scripts/requirements.txt
 
-      - name: Preserve last published metadata
-        run: |
-          cp distillates/soccer/meta.json "$RUNNER_TEMP/soccer-previous-meta.json"
-          rm -f distillates/soccer/freshness_status.json
-
+      # Each stage below writes distillates/soccer/freshness_status.json on
+      # failure (stage, error category, attempts, vintages, run id). The file is
+      # evidence only: publication still depends on the verify step exiting 0.
       - name: Pull raw sources (martj42 international results)
+        timeout-minutes: 9
         run: python scripts/pull_soccer.py
 
       - name: Distill
+        timeout-minutes: 3
         run: python scripts/distill_soccer.py
 
       - name: Verify calendar and independent fixture coverage
+        timeout-minutes: 12
         run: python scripts/soccer_freshness.py --previous-meta "$RUNNER_TEMP/soccer-previous-meta.json"
+
+      - name: Commit refreshed distillates
+        id: publish
+        if: github.ref == 'refs/heads/main'
+        timeout-minutes: 4
+        run: |
+          git config user.name "spine-bot"
+          git config user.email "spine-bot@users.noreply.github.com"
+          git add data/soccer/raw distillates/soccer
+          if git diff --cached --quiet; then
+            echo "committed=no" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "refresh: soccer distillates $(date -u +%Y-%m-%d)"
+            echo "committed=yes" >> "$GITHUB_OUTPUT"
+          fi
+          git pull --rebase origin main
+          git push || (git pull --rebase origin main && git push)
+
+      # Runs on main whatever the publish step did (success, failure, timeout).
+      # Compares the remote head with this run's commit and reads the committed
+      # distillates back from the immutable commit URL. Reports true / false /
+      # "unchanged" / "unknown" — never an assumption.
+      - name: Verify publication
+        if: always() && github.ref == 'refs/heads/main'
+        timeout-minutes: 4
+        run: |
+          python3 scripts/soccer_publish_verify.py \
+            --repo "$GITHUB_REPOSITORY" --branch main \
+            --local-head "$(git rev-parse HEAD)" --base-head "$base_head" \
+            --committed "${{ steps.publish.outputs.committed || 'unknown' }}" \
+            --push-outcome "${{ steps.publish.outcome }}" \
+            --previous-meta "$RUNNER_TEMP/soccer-previous-meta.json"
+
+      # A failing job with no stage result is itself a defect. If the file still
+      # holds only this run's init record (or something stale/malformed slipped
+      # in), write an explicit gap record so the absence is visible.
+      - name: Ensure a diagnostic exists
+        if: always()
+        run: |
+          python3 scripts/soccer_diagnostics.py --if-missing --stage workflow \
+            --message "no stage wrote a result; inspect the job log" \
+            --previous-meta "$RUNNER_TEMP/soccer-previous-meta.json"
 
       - name: Retain freshness diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: soccer-freshness-${{ github.run_id }}
+          name: soccer-freshness-${{ github.run_id }}-${{ github.run_attempt }}
           path: distillates/soccer/freshness_status.json
-          if-no-files-found: ignore
-
-      - name: Commit refreshed distillates
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git config user.name "spine-bot"
-          git config user.email "spine-bot@users.noreply.github.com"
-          git add data/soccer/raw distillates/soccer
-          git diff --cached --quiet || git commit -m "refresh: soccer distillates $(date -u +%Y-%m-%d)"
-          git pull --rebase origin main
-          git push || (git pull --rebase origin main && git push)
+          if-no-files-found: error
+          retention-days: 30

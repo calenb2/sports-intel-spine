@@ -11,7 +11,7 @@ B09,method,AASP CMPC,https://appliedsportpsych.org/certification/,reference,SIA 
 B10,method,Renshaw et al. 2022 ecological dynamics,https://www.sciencedirect.com/science/article/pii/S2667239122000089,reference,SIA doctrine,Skill acquisition
 B11,method,Mead et al. 2023 expected goals,https://pmc.ncbi.nlm.nih.gov/articles/PMC10075453/,reference,SIA doctrine,Opportunity quality metrics
 B12,method,AASP / Team USA mental performance,https://www.usopc.org/mental-performance,reference,SIA doctrine,Applied mental skills
-D01,data,martj42 international_results (GitHub mirror of Kaggle set),https://github.com/martj42/international_results,CC BY 4.0 (verify on repo),Soccer Tier-2 rolling + WC base rates,Pulled by refresh workflow; includes World Cup
+D01,data,martj42 international_results (GitHub mirror of Kaggle set),https://github.com/martj42/international_results,CC0 1.0 (repo LICENSE; verified 2026-11-08),Soccer Tier-2 rolling + WC base rates,Pulled by refresh workflow; includes World Cup
 D02,data,World Football Elo Ratings,https://eloratings.net/,permissive reuse per site,Soccer team strength prior,Manual CSV via Kaggle mirrors; drop as data/soccer/raw/elo.csv
 D03,data,Kaggle 2026 FIFA WC Historical Elo,https://www.kaggle.com/datasets/afonsofernandescruz/2026-fifa-world-cup-historical-elo-ratings,Kaggle dataset license,WC 2026 Elo seed,Calen downloads (Kaggle account)
 D04,data,nflverse data releases,https://github.com/nflverse/nflverse-data/releases,CC; free,NFL Tier-2 (Phase R1),Nightly in-season; no account needed
