@@ -3,7 +3,7 @@
   "files": {
     "results.csv": {
       "source": "https://raw.githubusercontent.com/martj42/international_results/master/results.csv",
-      "license": "CC BY 4.0 - verify current terms on repo",
+      "license": "CC0 1.0 Universal (repository LICENSE file, verified 2026-11-08; Kaggle card and manifest previously said CC BY 4.0)",
       "coverage": "Men's full internationals 1872-present incl. FIFA World Cup",
       "pulled_at": "2026-11-09T13:32:48.350341+00:00",
       "known_caveats": [

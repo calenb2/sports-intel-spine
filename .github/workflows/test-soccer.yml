@@ -7,7 +7,7 @@ on:
       - 'data/soccer/*.json'
       - '.github/workflows/*soccer*.yml'
   push:
-    branches: ['fix/soccer-calendar-freshness']
+    branches: ['fix/soccer-**']
 permissions:
   contents: read
 jobs:

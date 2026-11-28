@@ -7,10 +7,12 @@ Design: compute at refresh time, not chat time. Outputs stay small and flat (SIA
 payload carries provenance; the GPT echoes as_of in its output).
 """
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+import soccer_diagnostics as diag
 from soccer_freshness import merged_result_rows
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,9 +27,14 @@ def load_results() -> pd.DataFrame:
         RAW / "results.csv", ROOT / "data/soccer/result_supplements.json",
         datetime.now(timezone.utc).date())
     df = pd.DataFrame(rows)
+    needed = {"date", "home_team", "away_team", "home_score", "away_score", "tournament", "neutral"}
+    if not needed.issubset(df.columns):
+        raise ValueError("Merged results lack a column the distiller consumes")
     df["date"] = pd.to_datetime(df["date"])
     df["home_score"] = df["home_score"].astype(int)
     df["away_score"] = df["away_score"].astype(int)
+    if not df["neutral"].isin(["TRUE", "FALSE"]).all() or (df["tournament"].str.strip() == "").any():
+        raise ValueError("Merged results contain an invalid neutral flag or empty tournament")
     df["neutral"] = df["neutral"].map({"TRUE": True, "FALSE": False})
     df.attrs.update(provenance)
     return df
@@ -154,9 +161,15 @@ def main() -> None:
         "sia_note": "If data_through lags today by >7 days in-tournament, apply SIA-02 staleness confidence penalty",
     }
 
-    (OUT / "team_profiles.json").write_text(json.dumps(profiles, separators=(",", ":")), encoding="utf-8")
-    (OUT / "wc_base_rates.json").write_text(json.dumps(base_rates, indent=1), encoding="utf-8")
-    (OUT / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+    # Serialize everything first with allow_nan=False so a NaN/Infinity anywhere
+    # fails before any distillate is replaced on disk (no half-written set).
+    payloads = {
+        "team_profiles.json": json.dumps(profiles, separators=(",", ":"), allow_nan=False),
+        "wc_base_rates.json": json.dumps(base_rates, indent=1, allow_nan=False),
+        "meta.json": json.dumps(meta, indent=1, allow_nan=False),
+    }
+    for name, text in payloads.items():
+        (OUT / name).write_text(text, encoding="utf-8")
     sample = OUT / "SAMPLE_team_profiles.json"
     if sample.exists():
         sample.unlink()
@@ -164,4 +177,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    _started = diag.utc_now()
+    try:
+        main()
+    except Exception as _exc:  # noqa: BLE001 - every distill failure leaves a diagnostic
+        diag.emit_failure("distill", _exc, started_at=_started)
+        sys.exit(1)
